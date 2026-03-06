@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calendar AI</title>
+</head>
+<body>
+    <h1>Calendar AI Dashboard</h1>
+
+    <button onclick="login()">Login with Google</button>
+    <br><br>
+    <button onclick="getEvents()">Get Events</button>
+    <button onclick="createEvent()">Create Test Event</button>
+    <div id = "calendar" style = "display: none;">
+        <select name = "calendars" id = "calendars">
+            <option value = "primary"> Primary </option>
+        </select>
+        <input placeholder="date" id = "dateInput_event" type = "date">
+        <input placeholder = "start_time" id = "start_time" type = "time">
+        <input placeholder="end_time" id = "end_time" type = "time">
+        <button onclick="submit_event()">Create</button>
+    </div>
+    <br><br>
+
+    <button onclick = "getTasks()">Get Tasks</button>
+    <button onclick = "createTasks()">Create Tasks</button>
+    <div id = "task" style = "display: none;">
+        <input placeholder="title" id = "title_task" type = "string">
+        <input placeholder = "date" id = "dateInput_task" type = "date">
+        <input placeholder="due" id = "due_task" type = "time">
+        <button onclick="submit_task()">Create</button>
+    </div>
+
+
+    <pre id="output"></pre>
+
+    <script>
+        const API_BASE = "http://localhost:8000";
+
+        function login() {
+            // Redirect user to backend OAuth route
+            window.location.href = API_BASE + "/auth/login";
+        }
+
+        async function getEvents() {
+            try {
+                const res = await fetch("http://localhost:8000/events");
+                const data = await res.json();
+                document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById("output").textContent = "Fetch failed: " + err.message;
+            }
+        }
+
+        
+        function createEvent() {
+            const panel = document.getElementById("calendar");
+            if (!panel) {
+                document.getElementById("output").textContent = "calendar div not found";
+                return;
+            }
+            panel.style.display = "block";
+        }
+
+        function createTasks(){
+            const panel = document.getElementById("task");
+            if (!panel) {
+                document.getElementById("output").textContent = "task div not found";
+                return;
+            }
+            panel.style.display = "block";
+        }
+
+        async function submit_task(){
+            const title = document.getElementById("title_task").value;
+            const date = document.getElementById("dateInput_task").value;
+            const due = document.getElementById("due_task").value;
+
+            try {
+                const res = await fetch(`${API_BASE}/create-task?title=${encodeURIComponent(title)}&date=${encodeURIComponent(date)}&due=${encodeURIComponent(due)}`);
+                const data = await res.json();
+                document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+                if (res.ok && !data.error) {
+                    document.getElementById("task").style.display = "none";
+                }
+            } catch (err) {
+                document.getElementById("output").textContent = "Create task failed: " + err.message;
+            }
+        }
+
+        async function getTasks(){
+            try{
+                const res = await fetch("http://localhost:8000/get-tasks")
+                const data = await res.json();
+                document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+            }catch (err) {
+                document.getElementById("output").textContent = "Fatech failed";
+            }
+        }
+        async function submit_event() {
+            //const res = await fetch("http://localhost:8000/create-test-event");
+            //const data = await res.json();
+            //document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+            
+            const calendar = document.getElementById("calendars").value;
+            const time = document.getElementById("dateInput").value;
+            const start = document.getElementById("start_time").value;
+            const end = document.getElementById("end_time").value;
+
+            const res = await fetch (`${API_BASE}/create-test-event?calendar=${calendar}&date=${time}&start=${start}&end=${end}`)
+            document.getElementById("calendar").style.display = "none";
+        }
+
+        async function getKeywords() {
+            const res = await fetch(API_BASE + "/create-test-event");
+            const data = await res.json();
+            document.getElementById("output").textContent =
+                JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>
+
+
+
