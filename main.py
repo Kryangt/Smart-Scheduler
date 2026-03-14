@@ -1,7 +1,10 @@
 import os
+from datetime import datetime
+from typing import List, Optional
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -10,6 +13,7 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from google_tasks_service import create_task, get_tasks_list
 from google_events_service import get_events, create_event
+from scheduler_service import schedule
 
 load_dotenv()
 os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
@@ -28,6 +32,14 @@ app.add_middleware(
 )
 user_credentials = {}
 
+class TaskInput(BaseModel):
+    title: str
+    deadline: str
+    estimated_duration: float
+
+class ScheduleRequest(BaseModel):
+    tasks: List[TaskInput]
+    calendar: Optional[str] = "primary"
 
 
 @app.get("/")
@@ -68,7 +80,7 @@ def callback(request: Request):
     credentials = flow.credentials
     user_credentials["creds"] = credentials_to_dict(credentials)
 
-    return RedirectResponse("http://localhost:3000/frontend.html")
+    return RedirectResponse("http://localhost:3000")
 
 @app.get("/events")
 def get_events_api():
@@ -112,11 +124,43 @@ def create_task_api(title: str = None, date: str = None, due: str = None):
     if title is None or title.strip() == "":
         return {"error": "Missing information"}
 
-        creds = Credentials(**user_credentials["creds"])
-        created_task = create_task(creds, date, due)
+    creds = Credentials(**user_credentials["creds"])
+    created_task = create_task(creds, title, date, due)
 
-        return {"task": created_task}
+    return {"task": created_task}
 
+@app.post("/schedule-tasks")
+def schedule_tasks_api(payload: ScheduleRequest):
+    if "creds" not in user_credentials:
+        return {"error": "User not authenticated"}
+
+    creds = Credentials(**user_credentials["creds"])
+    tasks = [task.model_dump() for task in payload.tasks]
+    schedule_result = schedule(creds, tasks)
+
+    created_task = []
+    for item in schedule_result.get("scheduled", []):
+        start_dt = datetime.fromisoformat(item["start"])
+        end_dt = datetime.fromisoformat(item["end"])
+        date = start_dt.date().isoformat()
+        start_time = start_dt.strftime("%H:%M")
+        end_time = end_dt.strftime("%H:%M")
+        summary = item.get("title", "AI Scheduled Task")
+        chunk = item.get("chunk")
+        if chunk:
+            summary = f"{summary} ({chunk})"
+
+        created_task = create_task(
+            creds,
+            payload.calendar or "primary",
+            date,
+            start_time,
+            end_time,
+            summary=summary
+        )
+        created_task.append(created_task)
+
+    return {"schedule": schedule_result, "created_events": created_task}
 
 def credentials_to_dict(credentials):
     return {
@@ -127,7 +171,3 @@ def credentials_to_dict(credentials):
         "client_secret": credentials.client_secret,
         "scopes": credentials.scopes,
 }
-
-
-
-

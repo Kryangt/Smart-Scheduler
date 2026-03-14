@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -16,7 +17,7 @@ def get_tasks_list(creds):
 
     return {"Tasks": tasks}
 
-def create_task(creds, title: None, date: str = None, due: str = None):
+def create_task(creds, title: str = None, date: str = None, due: str = None):
         
     service = get_tasks_service(creds)
     task = {

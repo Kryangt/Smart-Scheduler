@@ -22,12 +22,17 @@
     <br><br>
 
     <button onclick = "getTasks()">Get Tasks</button>
-    <button onclick = "createTasks()">Create Tasks</button>
+    <button onclick = "createTasks()">Add Tasks</button>
     <div id = "task" style = "display: none;">
         <input placeholder="title" id = "title_task" type = "string">
-        <input placeholder = "date" id = "dateInput_task" type = "date">
-        <input placeholder="due" id = "due_task" type = "time">
-        <button onclick="submit_task()">Create</button>
+        <input placeholder = "deadline date" id = "dateInput_task" type = "date">
+        <input placeholder="duration hours" id = "duration_task" type = "number" step = "0.5" min = "0.5">
+        <button onclick="add_task()">Add</button>
+    </div>
+    <div id="task-preview" style="margin-top: 12px; display: none;">
+        <h3>Task Preview</h3>
+        <ul id="task-list"></ul>
+        <button onclick="schedule_tasks()">Schedule</button>
     </div>
 
 
@@ -35,6 +40,7 @@
 
     <script>
         const API_BASE = "http://localhost:8000";
+        const tempTasks = [];
 
         function login() {
             // Redirect user to backend OAuth route
@@ -70,20 +76,72 @@
             panel.style.display = "block";
         }
 
-        async function submit_task(){
-            const title = document.getElementById("title_task").value;
-            const date = document.getElementById("dateInput_task").value;
-            const due = document.getElementById("due_task").value;
+        function add_task(){
+            const title = document.getElementById("title_task").value.trim();
+            const deadline = document.getElementById("dateInput_task").value;
+            const durationRaw = document.getElementById("duration_task").value;
+            const duration = parseFloat(durationRaw);
+
+            if (!title || !deadline || isNaN(duration) || duration <= 0) {
+                document.getElementById("output").textContent = "Please provide title, deadline date, and duration hours.";
+                return;
+            }
+
+            tempTasks.push({
+                title: title,
+                deadline: deadline,
+                estimated_duration: duration
+            });
+
+            document.getElementById("title_task").value = "";
+            document.getElementById("dateInput_task").value = "";
+            document.getElementById("duration_task").value = "";
+
+            render_task_preview();
+        }
+
+        function render_task_preview(){
+            const preview = document.getElementById("task-preview");
+            const list = document.getElementById("task-list");
+            list.innerHTML = "";
+
+            if (tempTasks.length === 0) {
+                preview.style.display = "none";
+                return;
+            }
+
+            tempTasks.forEach((task, idx) => {
+                const li = document.createElement("li");
+                li.textContent = `${idx + 1}. ${task.title} | deadline: ${task.deadline} | duration: ${task.estimated_duration}h`;
+                list.appendChild(li);
+            });
+
+            preview.style.display = "block";
+        }
+
+        async function schedule_tasks(){
+            if (tempTasks.length === 0) {
+                document.getElementById("output").textContent = "No tasks to schedule.";
+                return;
+            }
 
             try {
-                const res = await fetch(`${API_BASE}/create-task?title=${encodeURIComponent(title)}&date=${encodeURIComponent(date)}&due=${encodeURIComponent(due)}`);
+                const res = await fetch(`${API_BASE}/schedule-tasks`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ tasks: tempTasks, calendar: "primary" })
+                });
                 const data = await res.json();
                 document.getElementById("output").textContent = JSON.stringify(data, null, 2);
                 if (res.ok && !data.error) {
+                    tempTasks.length = 0;
+                    render_task_preview();
                     document.getElementById("task").style.display = "none";
                 }
             } catch (err) {
-                document.getElementById("output").textContent = "Create task failed: " + err.message;
+                document.getElementById("output").textContent = "Schedule failed: " + err.message;
             }
         }
 
