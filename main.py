@@ -48,39 +48,46 @@ def root():
 
 @app.get("/auth/login")
 def login():
-    flow = Flow.from_client_secrets_file(
-        "credentials.json",
-        scopes=SCOPES,
-        redirect_uri="http://localhost:8000/auth/callback"
-    )
+    if os.path.exists("credentials.json"):
+        flow = Flow.from_client_secrets_file(
+            "credentials.json",
+            scopes=SCOPES,
+            redirect_uri="http://localhost:8000/auth/callback"
+        )
 
-    auth_url, state = flow.authorization_url(
-        access_type="offline",
-        prompt="consent"
-    )
+        auth_url, state = flow.authorization_url(
+            access_type="offline",
+            prompt="consent"
+        )
 
-    user_credentials["state"] = state
-    return RedirectResponse(auth_url)
+        user_credentials["state"] = state
+        return RedirectResponse(auth_url)
+    else:
+        raise RuntimeError("OAuth credentials not configured")
+
 
 @app.get("/auth/callback")
 def callback(request: Request):
     state = user_credentials.get("state")
     if not state:
         return JSONResponse(status_code=400, content={"error": "Missing OAuth state. Start again at /auth/login"})
+    if os.path.exists("credentials.json"):
+        flow = Flow.from_client_secrets_file(
+            "credentials.json",
+            scopes=SCOPES,
+            redirect_uri="http://localhost:8000/auth/callback",
+            state=state,
+        )
 
-    flow = Flow.from_client_secrets_file(
-        "credentials.json",
-        scopes=SCOPES,
-        redirect_uri="http://localhost:8000/auth/callback",
-        state=state,
-    )
+        flow.fetch_token(authorization_response=str(request.url))
 
-    flow.fetch_token(authorization_response=str(request.url))
+        credentials = flow.credentials
+        user_credentials["creds"] = credentials_to_dict(credentials)
 
-    credentials = flow.credentials
-    user_credentials["creds"] = credentials_to_dict(credentials)
+        return RedirectResponse("http://localhost:3000")
+    else:
+        raise RuntimeError("OAuth credentials not configured")
 
-    return RedirectResponse("http://localhost:3000")
 
 @app.get("/events")
 def get_events_api():
