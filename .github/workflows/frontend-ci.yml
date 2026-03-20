@@ -23,5 +23,5 @@ jobs:
         working-directory: frontend
 
       - name: Run frontend tests
-        run: npx vitest run --watchAll=false
+        run: npx vitest run
         working-directory: frontend

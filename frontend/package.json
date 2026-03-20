@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "npx vitest run --watchAll=false"
+    "test": "npx vitest run"
   },
 
   "dependencies": {
