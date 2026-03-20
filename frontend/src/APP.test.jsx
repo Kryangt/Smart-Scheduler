@@ -1,7 +1,8 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import App from "./App";
+import { vi } from "vitest";
 
-global.fetch = jest.fn(); // mock fetch for all API calls
+global.fetch = vi.fn(); // mock fetch for all API calls
 
 test("renders main heading and buttons", () => {
     render(<App />);
