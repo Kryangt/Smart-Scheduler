@@ -26,4 +26,5 @@ jobs:
       - name: Run frontend tests
         run: |
           cd frontend
-          npm test -- --watchAll=false
+          npx vitest run --watchAll=false
+
