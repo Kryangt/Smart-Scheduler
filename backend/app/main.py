@@ -1,7 +1,16 @@
 import os
+
+VPN_PORT = "7897" 
+os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
+
 import secrets
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlsplit, urlunsplit
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,18 +21,20 @@ from dotenv import load_dotenv
 from backend.app.services.google_tasks_service import create_task, get_tasks_list
 from backend.app.services.google_events_service import get_events, create_event
 from backend.app.services.scheduler_service import schedule
-
+from backend.app.services.ai_assistance_service import ai_assistance_control_center
+from typing import Literal, List
 
 #database part
-from app.database.base import Base
+from backend.app.database.base import Base
 from backend.app.database.connection import get_connection
-from app.database.connection import engine
-from app.models.User import User
-from app.models.Task import Task
-from backend.app.models.Scheduled_Blocks import ScheduleBlock
-from app.models.Action_Log import ActionLog
+from backend.app.database.connection import engine
+from backend.app.models.User import User
+from backend.app.models.Task import Task
+from backend.app.models.Scheduled_Blocks import Scheduled_Blocks
+from backend.app.models.Action_Log import ActionLog
 
-load_dotenv()
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BACKEND_DIR / ".env")
 
 app = FastAPI()
 
@@ -41,6 +52,15 @@ DEFAULT_CORS_ORIGINS = [
 ]
 oauth_state_store = {}
 credential_store = {}
+
+
+def is_local_redirect_uri() -> bool:
+    return GOOGLE_REDIRECT_URI.startswith(("http://localhost", "http://127.0.0.1"))
+
+
+if is_local_redirect_uri():
+    # OAuth requires HTTPS in production. This exception is only for local dev.
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 Base.metadata.create_all(bind=engine) #build databases first
 
@@ -121,6 +141,17 @@ def get_session_credentials(request: Request) -> Credentials:
     return Credentials(**stored_creds)
 
 
+def build_authorization_response(request: Request) -> str:
+    redirect_uri = urlsplit(GOOGLE_REDIRECT_URI)
+    return urlunsplit((
+        redirect_uri.scheme,
+        redirect_uri.netloc,
+        redirect_uri.path,
+        request.url.query,
+        "",
+    ))
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
@@ -138,6 +169,16 @@ class ScheduleRequest(BaseModel):
     tasks: List[TaskInput]
     calendar: Optional[str] = "primary"
 
+class CreateEventRequest(BaseModel):
+    calendar: str = "primary"
+    date: str
+    start: str
+    end: str
+
+class CreateTaskRequest(BaseModel):
+    title: str
+    date: str | None = None
+    due: str | None = None
 
 @app.get("/")
 def root():
@@ -174,11 +215,8 @@ def callback(request: Request):
     flow = create_google_flow(state=state)
 
 
-    trusted_base = "https://smartschedule-backend-266249423936.us-central1.run.app"
-    path = request.url.path
-    query = request.url.query
-    authorization_response = f"{trusted_base}{path}?{query}"
-    flow.fetch_token(authorization_response= authorization_response)
+    authorization_response = build_authorization_response(request)
+    flow.fetch_token(authorization_response=authorization_response)
 
     credentials = flow.credentials
     credential_store[session_id] = credentials_to_dict(credentials)
@@ -195,13 +233,15 @@ def get_events_api(request: Request):
     return {"events": all_events}
 
 @app.post("/events")
-def create_event_api(request: Request, calendar: str = None, date: str = None, start: str = None, end: str = None):
-    if(calendar == None or date == None or start == None or end == None):
-        return {"error": "No enough information"}
-    
+def create_event_api(request: Request, payload: CreateEventRequest):
     creds = get_session_credentials(request)
-    created_event = create_event(creds, calendar, date, start, end)
-
+    created_event = create_event(
+        creds,
+        payload.calendar,
+        payload.date,
+        payload.start,
+        payload.end,
+    )
     return {"event": created_event}
 
 @app.get("/tasks")
@@ -212,13 +252,14 @@ def get_tasks_list_api(request: Request):
     return {"Tasks": tasks}
 
 @app.post("/tasks")
-def create_task_api(request: Request, title: str = None, date: str = None, due: str = None):
-    if title is None or title.strip() == "":
-        return {"error": "Missing information"}
-
+def create_task_api(request: Request, payload: CreateTaskRequest):
     creds = get_session_credentials(request)
-    created_task = create_task(creds, title, date, due)
-
+    created_task = create_task(
+        creds,
+        payload.title,
+        payload.date,
+        payload.due,
+    )
     return {"task": created_task}
 
 @app.post("/scheduledtasks")
@@ -235,9 +276,6 @@ def schedule_tasks_api(request: Request, payload: ScheduleRequest):
         start_time = start_dt.strftime("%H:%M")
         end_time = end_dt.strftime("%H:%M")
         summary = item.get("title", "AI Scheduled Task")
-        chunk = item.get("chunk")
-        if chunk:
-            summary = f"{summary} ({chunk})"
 
         created_event = create_event(
             creds,
@@ -255,6 +293,22 @@ def schedule_tasks_api(request: Request, payload: ScheduleRequest):
 def pdf_file_upload_api():
     #TODO: pass the file to AI and divide sub-tasks and determine time needed for each sub tasks
     return {"file upload success"}
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+class TaskDecompositeRequest(BaseModel):
+    messages: List[ChatMessage]
+
+@app.post("/task-decomposition")
+def decompose_tasks_api(request: Request, payLoad: TaskDecompositeRequest):
+    if(len(payLoad.messages) == 0):
+        return {"No messages detect"}
+    if(payLoad.messages[len(payLoad.messages-1)].role != "user"):
+        return {"Last turn shoudld be user"}
+    ai_assistance_control_center(payLoad)
+    return {"nothing"}
 
 @app.get("/test-db")
 def test_db_api():
@@ -277,5 +331,3 @@ def credentials_to_dict(credentials):
         "client_secret": credentials.client_secret,
         "scopes": credentials.scopes,
 }
-
-

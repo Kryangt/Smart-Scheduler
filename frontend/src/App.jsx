@@ -1,7 +1,8 @@
 import { useState } from "react";
 import "./App.css";
+import ChatPanel from "./ChatPanel.jsx";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 function App() {
   const [output, setOutput] = useState("");
@@ -28,7 +29,9 @@ function App() {
 
   const getEvents = async () => {
     try {
-      const res = await fetch(`${API_BASE}/events`);
+      const res = await fetch(`${API_BASE}/events`, {
+        credentials: "include",
+      });
       const data = await res.json();
       setOutput(JSON.stringify(data, null, 2));
     } catch (err) {
@@ -38,7 +41,9 @@ function App() {
 
   const getTasks = async () => {
     try {
-      const res = await fetch(`${API_BASE}/get-tasks`);
+      const res = await fetch(`${API_BASE}/tasks`, {
+        credentials: "include",
+      });
       const data = await res.json();
       setOutput(JSON.stringify(data, null, 2));
     } catch (err) {
@@ -53,19 +58,25 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(
-        `${API_BASE}/create-test-event?calendar=${encodeURIComponent(
-          calendar
-        )}&date=${encodeURIComponent(date)}&start=${encodeURIComponent(
-          start
-        )}&end=${encodeURIComponent(end)}`
-      );
+      const res = await fetch(`${API_BASE}/events`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json", 
+        },
+        body: JSON.stringify({
+          calendar,
+          date,
+          start,
+          end,
+        }),
+      });  
       if (!res.ok) {
         const data = await res.json();
         setOutput(JSON.stringify(data, null, 2));
         return;
       }
-      setOutput("Event created.");
+      setOutput(JSON.stringify(data, null, 2));
       setShowEventForm(false);
     } catch (err) {
       setOutput(`Create event failed: ${err.message}`);
@@ -96,13 +107,31 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/schedule-tasks`, {
+      const res = await fetch(`${API_BASE}/scheduledtasks`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tasks, calendar: "primary" })
       });
       const data = await res.json();
-      setOutput(`schedule successed`);
+      //data include scheduled tasks and unscheduled tasks
+      let result = data["schedule"]
+      const scheduledTasks = result.scheduled;
+      const unscheduledTasks = result.unscheduled;
+      
+      // Turn the arrays into strings directly
+      const scheduledText = scheduledTasks
+        .map((task, index) => `${index+1}. ${task.title} start: ${task.start} end: ${task.end}`)
+        .join('\n');
+      
+      const unscheduledText = unscheduledTasks
+        .map((task, index) => `${index+1}. ${task.title}`)
+        .join('\n');
+      
+      // Combine everything cleanly using a template literal
+      const totalOutput = `Scheduled Tasks: \n${scheduledText}\n\nUnscheduled Tasks: \n${unscheduledText}`;
+      
+      setOutput(totalOutput);
       if (res.ok && !data.error) {
         setTasks([]);
         setShowTaskForm(false);
@@ -118,7 +147,6 @@ function App() {
       <div className="row">
         <button onClick={login}>Login with Google</button>
       </div>
-
       <div className="row">
         <button onClick={getEvents}>Get Events</button>
         <button onClick={() => setShowEventForm(true)}>Create Test Event</button>
@@ -213,10 +241,12 @@ function App() {
           <button onClick={scheduleTasks}>Schedule</button>
         </div>
       )}
-
       <pre className="output">{output}</pre>
+      <ChatPanel />
     </div>
+    
   );
 }
-
 export default App;
+
+

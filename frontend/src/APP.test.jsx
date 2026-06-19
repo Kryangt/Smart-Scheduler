@@ -3,6 +3,7 @@ import App from "./App";
 import { describe, it, test, expect, vi, beforeEach } from "vitest";
 
 global.fetch = vi.fn(); // mock fetch for all API calls
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 test("renders main heading and buttons", () => {
     render(<App />);
@@ -17,13 +18,13 @@ delete window.location; // in the test environment, window.location is usually r
 window.location = { href: "" }; //assign a writable object
 
 fireEvent.click(screen.getByText(/Login with Google/i));
-expect(window.location.href).toBe("http://localhost:8000/auth/login");
+expect(window.location.href).toBe(`${API_BASE}/auth/login`);
 });
 
 test("adds a task when form is filled correctly", () => {
     render(<App />);
   
-    fireEvent.click(screen.getByText(/Add Tasks/i));
+    fireEvent.click(screen.getByRole("button", { name: /^Add Tasks$/i }));
   
     fireEvent.change(screen.getByPlaceholderText("title"), {
       target: { value: "Test Task" },
@@ -44,7 +45,7 @@ test("adds a task when form is filled correctly", () => {
   test("schedules tasks and clears task list after success", async () => {
     render(<App />);
   
-    fireEvent.click(screen.getByText(/Add Tasks/i));
+    fireEvent.click(screen.getByRole("button", { name: /^Add Tasks$/i }));
     fireEvent.change(screen.getByPlaceholderText("title"), {
       target: { value: "Task 1" },
     });

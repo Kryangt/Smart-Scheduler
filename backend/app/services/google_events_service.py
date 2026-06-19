@@ -1,7 +1,13 @@
 from datetime import datetime
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import httplib2
+import google_auth_httplib2
+# def get_calendar_service(creds):
+#     return build("calendar", "v3", credentials=creds)
 
+
+#In China, we have to use VPN
 def get_calendar_service(creds):
     return build("calendar", "v3", credentials=creds)
 

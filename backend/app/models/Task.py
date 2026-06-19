@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey
-from app.database.base import Base
+from backend.app.database.base import Base
 from sqlalchemy.orm import relationship
 
 class Task(Base):
@@ -19,6 +19,6 @@ class Task(Base):
     created_time = Column(DateTime)
     uodated_time = Column(DateTime)
 
-    user = relationship("User", back_populates="tasks") #given a task, return all users objects related to this task
+    user = relationship("User", back_populates="tasks") #given a task, return all users objects related to this task, need to define foriegn keys
     schedule_blocks = relationship("ScheduleBlock", back_populates="task")
     action_logs = relationship("ActionLog", back_populates="task")

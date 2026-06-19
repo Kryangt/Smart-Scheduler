@@ -2,3 +2,9 @@ credentials.json
 
 __pycache__/
 *.pyc
+
+.env
+*.env
+
+dist/
+node_modules/

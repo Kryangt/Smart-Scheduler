@@ -1,14 +1,25 @@
 from datetime import datetime, timedelta
 import math
 
-from app.services.google_events_service import get_events
+from backend.app.services.google_events_service import get_events
 
 
 # TODO: Make these user-configurable.
 WORK_START = 8
 WORK_END = 22
 
+
+#TODO: default deadline time is 23:59: 59, but also have to consider any specified deadline
+
 def _parse_deadline(deadline_str):
+    """ parse a string deadline to datetime format deadline
+    Args:
+        deadline_str: the date (year/month/day) of deadline in string format
+    Returns:
+        the datetime format of deadline with hour, minute, second
+    Raises:
+        ValueError: unsupported deadline format
+    """
     for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
         try:
             day = datetime.strptime(deadline_str, fmt)
@@ -19,7 +30,16 @@ def _parse_deadline(deadline_str):
     raise ValueError(f"Unsupported deadline format: {deadline_str}")
 
 
+
 def _parse_event_time(value):
+
+    """ parse a dictionary input time to datetime format
+    Args:
+        value: the disctionary format of time
+    Returns:
+        the datetime format
+    """
+
     if value is None:
         return None
 
@@ -33,29 +53,17 @@ def _parse_event_time(value):
 
 
 def preprocess(tasks):
-    # TODO: Current design discretizes tasks into 1-hour units.
     processed_tasks = []
     latest_deadline = None
 
     for task in tasks:
-        duration = float(task["estimated_duration"])
-        full_hours = int(math.ceil(duration))
         deadline_dt = _parse_deadline(task["deadline"])
 
         if latest_deadline is None or deadline_dt > latest_deadline:
             latest_deadline = deadline_dt
-
-        for chunk_idx in range(full_hours):
-            processed_tasks.append(
-                {
-                    "title": task["title"],
-                    "deadline": deadline_dt,
-                    "estimated_duration": 1,
-                    "chunk": chunk_idx + 1,
-                    "chunks_total": full_hours,
-                }
-            )
-
+        
+        task["deadline"] = deadline_dt
+        processed_tasks.append(task)
     processed_tasks.sort(key=lambda t: t["deadline"])
     return processed_tasks, latest_deadline
 
@@ -86,7 +94,7 @@ def _gap_to_hour_slots(gap_start, gap_end):
     return slots
 
 
-def find_free_slots_flat(creds, latest_deadline):
+def find_free_intervals(creds, latest_deadline):
     payload = get_events(creds, end_time=latest_deadline)
     events = payload.get("events", [])
 
@@ -107,14 +115,25 @@ def find_free_slots_flat(creds, latest_deadline):
             continue
 
         if start > current_time:
-            free_slots.extend(_gap_to_hour_slots(current_time, start))
+            free_slots.append((current_time, start))
 
         if end > current_time:
             current_time = end
 
     if current_time < latest_deadline:
-        free_slots.extend(_gap_to_hour_slots(current_time, latest_deadline))
+        while current_time < latest_deadline:
+            day_end = current_time.replace(hour = WORK_END, minute = 0, second= 0, microsecond=0)
 
+            if(day_end > latest_deadline):
+                day_end = latest_deadline
+
+            if(day_end > current_time):
+                free_slots.append((current_time, day_end))
+            
+            current_time_start = current_time.date() + timedelta(days = 1) #current_time_start in the form YY/MM/DD
+            current_time = datetime.combine(current_time_start, datetime.min.time()).replace(hour=WORK_START)
+    
+    free_slots.sort(key = lambda t:t[0])
     return free_slots
 
 
@@ -125,84 +144,51 @@ def _lateness_hours(deadline, slot_end):
 
 
 def schedule(creds, tasks):
-    # 1) Preprocess tasks into 1-hour units.
     processed_tasks, latest_deadline = preprocess(tasks)
-    if not processed_tasks:
-        return {"scheduled": [], "total_lateness_hours": 0.0, "unscheduled": []}
+    free_intervals = find_free_intervals(creds, latest_deadline)
 
-    # 2) Find free 1-hour slots up to latest deadline.
-    free_slots = find_free_slots_flat(creds, latest_deadline)
-    if not free_slots:
-        return {
-            "scheduled": [],
-            "total_lateness_hours": None,
-            "unscheduled": processed_tasks,
-            "message": "No available free slots before latest deadline.",
-        }
-
-    n = len(processed_tasks)
-    m = len(free_slots)
-
-    #3) Go through the dp array to calculate minimum lateness hours
-    inf = float("inf")
-    dp = [[inf] * (m + 1) for _ in range(n + 1)]
-    choose = [[False] * (m + 1) for _ in range(n + 1)]
-
-    for j in range(m + 1):
-        dp[0][j] = 0.0
-
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            task = processed_tasks[i - 1]
-            slot_start, slot_end = free_slots[j - 1]
-
-            use_cost = dp[i - 1][j - 1] + _lateness_hours(task["deadline"], slot_end)
-            skip_cost = dp[i][j - 1]
-
-            if use_cost <= skip_cost:
-                dp[i][j] = use_cost
-                choose[i][j] = True
-            else:
-                dp[i][j] = skip_cost
-
-    if dp[n][m] == inf: #happened when the most late free slot is still earlier than the deadline of the earlist task
-        return {
-            "scheduled": [],
-            "total_lateness_hours": None,
-            "unscheduled": processed_tasks,
-            "message": "Not enough free slots to place all tasks.",
-        }
-
-    # Reconstruct chosen assignments.
     scheduled = []
-    i, j = n, m
-    while i > 0 and j > 0:
-        if choose[i][j]:
-            task = processed_tasks[i - 1]
-            slot_start, slot_end = free_slots[j - 1]
-            scheduled.append(
-                {
-                    "title": task["title"],
-                    "chunk": f"{task['chunk']}/{task['chunks_total']}",
-                    "start": slot_start.isoformat(),
-                    "end": slot_end.isoformat(),
-                    "deadline": task["deadline"].isoformat(),
-                    "lateness_hours": round(_lateness_hours(task["deadline"], slot_end), 3),
-                }
-            )
-            i -= 1
-            j -= 1
-        else:
-            j -= 1
-
-    scheduled.reverse()
-
     unscheduled = []
-    if i > 0:
-        unscheduled = processed_tasks[:i]
+    total_lateness = 0
+    
+    for task in processed_tasks:
+        task_title = task["title"]
+        task_duration = task["estimated_duration"]
+        task_deadline = task["deadline"]
+
+        free_slot = None
+        slot_index = -1
+        
+        for i, interval in enumerate(free_intervals):
+            interval_start = interval[0]
+            interval_end = interval[1]
+            
+            task_end_time = interval_start + timedelta(minutes=task_duration * 60)
+            
+            if task_deadline > interval_end and task_end_time <= interval_end:
+                free_slot = interval
+                slot_index = i
+                break
+
+        if free_slot is None:
+            unscheduled.append(task)
+        else:
+            start_time = free_slot[0]
+            end_time = start_time + timedelta(minutes=task_duration * 60)
+            
+            scheduled.append({
+                "title": task_title,
+                "start": start_time.isoformat(),
+                "end": end_time.isoformat()
+            })
+            
+            free_intervals[slot_index] = (end_time, free_slot[1])
+            
+            if end_time >= free_slot[1]:
+                free_intervals.pop(slot_index)
 
     return {
         "scheduled": scheduled,
-        "total_lateness_hours": round(dp[n][m], 3),
         "unscheduled": unscheduled,
+        "total_lateness": total_lateness
     }
