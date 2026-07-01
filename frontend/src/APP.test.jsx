@@ -42,7 +42,7 @@ test("adds a task when form is filled correctly", () => {
   });
 
   
-  test("schedules tasks and clears task list after success", async () => {
+  test("schedules tasks and show task list after success", async () => {
     render(<App />);
   
     fireEvent.click(screen.getByRole("button", { name: /^Add Tasks$/i }));
@@ -65,21 +65,19 @@ test("adds a task when form is filled correctly", () => {
         schedule:{
           scheduled:[{
             title: "Task 1",
-            start: "2026-07-01",
-            end: "2026-07-02"
+            start: "2026-03-25",
+            end: "2026-03-26"
           }],
           unscheduled:[]
         }
       }),
     }); //next time call fetch in the program, it will return this fake res
 
-    fireEvent.click(screen.getByText(""));
+    fireEvent.click(screen.getByText("Schedule"));
     
     //because react is asychronized, so need waitfor it to be updated
-    await waitFor(() =>
-      expect(screen.queryByText(/1. Task 1/)).not.toBeInTheDocument()
-    );
-  
-    expect(screen.getByText(/Scheduled Tasks:/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Scheduled Tasks:/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/1\. Task 1/)).toBeInTheDocument();
   });
   
