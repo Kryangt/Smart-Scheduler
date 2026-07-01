@@ -61,7 +61,7 @@ if is_local_redirect_uri():
     # OAuth requires HTTPS in production. This exception is only for local dev.
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
-Base.metadata.create_all(bind=engine) #build databases first
+Base.metadata.create_all(bind=get_engine()) #build databases first
 
 def get_cors_origins() -> List[str]:
     configured = os.getenv("CORS_ORIGINS")
