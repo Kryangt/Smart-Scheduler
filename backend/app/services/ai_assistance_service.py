@@ -2,11 +2,18 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from backend.app.services.scheduler_service import schedule
-load_dotenv("backend/.env")
 
-API_KEY  = os.getenv("AI_API_KEY")
 
-client = OpenAI(api_key = API_KEY)
+_client = None
+def getAIClient():
+
+    if _client is None:
+        load_dotenv("backend/.env")
+        API_KEY  = os.getenv("AI_API_KEY")
+        if not API_KEY:
+            _client = OpenAI(api_key = API_KEY)
+    
+    return _client
 #More structured layers of ai assistant workflow: input user prompt
 #STATE 1: Validate
 #STATE 2: Clarify
@@ -84,6 +91,7 @@ def ai_assistance_control_center(user_input):
     return structured_tasks
     #enter decomposition stage
 def _clarification_layer(messages, latest_user_message):
+    client = getAIClient()
     response = client.responses.create(
         model="gpt-5.5",  # define the model to use
         reasoning={"effort": "low"},
@@ -181,7 +189,7 @@ def _clarification_layer(messages, latest_user_message):
 def _decomposition_layer(clarification_result, messages):
     clarified_task = clarification_result["clarified_task"]
     known_info = clarification_result["known_info"]
-
+    client = getAIClient()
     response = client.responses.create(
         model = "gpt-5.3-chat-latest",
         reasoning= {"effort": "high"},
