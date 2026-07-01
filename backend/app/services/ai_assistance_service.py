@@ -227,6 +227,10 @@ def _decomposition_layer(clarification_result, messages):
                 "schema":{
                         "type": "object",
                         "properties": {
+                            "status":{
+                                "type": "string",
+                                "enum": ["decomposed"]
+                            },
                             "sub_tasks": {
                             "type": "array",
                             "items": {
@@ -346,7 +350,8 @@ def handle_task_schedule(cred, structured_tasks):
         }
         for task in structured_tasks.get("sub_tasks", [])
     ]
-    return schedule(cred, scheduler_ready_tasks)
+    schedule(cred, scheduler_ready_tasks)
+    return {"status": "finish task decomposition cycle"}
 
 def handle_feedback_improvement(messages, structured_tasks, feedbacks):
     if not feedbacks:
@@ -399,6 +404,10 @@ def handle_feedback_improvement(messages, structured_tasks, feedbacks):
                 "schema": {
                     "type": "object",
                     "properties": {
+                        "status":{
+                            "type": "string",
+                            "enum": ["waiting_feedback"]
+                        },
                         "sub_tasks": {
                             "type": "array",
                             "items": {

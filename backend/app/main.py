@@ -307,8 +307,8 @@ def decompose_tasks_api(request: Request, payLoad: TaskDecompositeRequest):
         return {"No messages detect"}
     if(payLoad.messages[len(payLoad.messages-1)].role != "user"):
         return {"Last turn shoudld be user"}
-    ai_assistance_control_center(payLoad)
-    return {"nothing"}
+
+    return ai_assistance_control_center(payLoad)
 
 @app.get("/test-db")
 def test_db_api():
