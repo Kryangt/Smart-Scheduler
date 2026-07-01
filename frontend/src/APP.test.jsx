@@ -61,16 +61,25 @@ test("adds a task when form is filled correctly", () => {
     // mock the schedule-tasks API
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ schedule: "success" }),
+      json: async () => ({ 
+        schedule:{
+          scheduled:[{
+            title: "Task 1",
+            start: "2026-07-01",
+            end: "2026-07-02"
+          }],
+          unscheduled:[]
+        }
+      }),
     }); //next time call fetch in the program, it will return this fake res
 
-    fireEvent.click(screen.getByText("Schedule"));
+    fireEvent.click(screen.getByText(""));
     
     //because react is asychronized, so need waitfor it to be updated
     await waitFor(() =>
       expect(screen.queryByText(/1. Task 1/)).not.toBeInTheDocument()
     );
-    
-    expect(screen.getByText(/schedule successed/i)).toBeInTheDocument();
+  
+    expect(screen.getByText(/Scheduled Tasks:/i)).toBeInTheDocument();
   });
   
