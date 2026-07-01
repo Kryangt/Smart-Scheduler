@@ -8,19 +8,53 @@ load_dotenv("backend/.env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-#engine creates a direct connection to the database so the sql queries are able to sent to db
-engine = create_engine(
-    DATABASE_URL,
-    echo = True #echo = true enables us to see the printed SQL statement
-) 
+_engine = None
+_SessionLocal = None
 
-#SessionLocal creats session object, a session can track ORM objects (maps between a row in a table in db and an object of a class in Python)
-#also a session can general SQL
-#use engine internally to transmit commands
-SessionLocal = sessionmaker (
-    bind = engine,
-    autoflush= False,
-    autocommit = False
-)
+
+def get_database_url():
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is not set")
+
+    return database_url
+
+
+def get_engine():
+    global _engine
+
+    if _engine is None:
+        _engine = create_engine(
+            get_database_url(),
+            echo=True
+        )
+
+    return _engine
+
+
+def get_session_local():
+    global _SessionLocal
+
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            bind=get_engine(),
+            autoflush=False,
+            autocommit=False
+        )
+
+    return _SessionLocal
+
+
+def get_db():
+    SessionLocal = get_session_local()
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(get_database_url())

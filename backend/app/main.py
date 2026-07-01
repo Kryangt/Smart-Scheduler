@@ -26,8 +26,7 @@ from typing import Literal, List
 
 #database part
 from backend.app.database.base import Base
-from backend.app.database.connection import get_connection
-from backend.app.database.connection import engine
+from backend.app.database.connection import get_connection, get_engine
 from backend.app.models.User import User
 from backend.app.models.Task import Task
 from backend.app.models.Scheduled_Blocks import Scheduled_Blocks
