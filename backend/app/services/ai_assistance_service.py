@@ -6,11 +6,11 @@ from backend.app.services.scheduler_service import schedule
 
 _client = None
 def getAIClient():
-
+    global _client
     if _client is None:
         load_dotenv("backend/.env")
         API_KEY  = os.getenv("AI_API_KEY")
-        if not API_KEY:
+        if API_KEY:
             _client = OpenAI(api_key = API_KEY)
     
     return _client
@@ -48,9 +48,7 @@ def getAIClient():
 
 
 
-def ai_assistance_control_center(user_input):
-    messages = user_input.messages
-
+def ai_assistance_control_center(messages):
     if not messages:
         return {"status": "error", "message": "No conversation provided"}
     latest_user_message = messages[len(messages)-1]
@@ -264,10 +262,9 @@ def _decomposition_layer(clarification_result, messages):
     )
     return response.output_parsed
 def _structuring_layer(decomposed_task):
-
-    
     decomposition_result = decomposed_task
     sub_tasks = decomposition_result.get("sub_tasks", [])
+    client = getAIClient()
     response = client.responses.create(
         model="gpt-5.5",
         reasoning={"effort": "low"},
@@ -305,6 +302,10 @@ def _structuring_layer(decomposed_task):
                 "schema": {
                     "type": "object",
                     "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": ["success"]
+                        },
                         "sub_tasks": {
                             "type": "array",
                             "items": {
@@ -366,7 +367,7 @@ def handle_feedback_improvement(messages, structured_tasks, feedbacks):
         return {"status": "error", "message": "Feedback is required for task improvement"}
 
     current_sub_tasks = structured_tasks.get("sub_tasks", [])
-
+    client = getAIClient()
     response = client.responses.create(
         model="gpt-5.5",
         reasoning={"effort": "low"},

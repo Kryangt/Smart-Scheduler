@@ -55,7 +55,7 @@ function ChatPanel() {
 
     const userText = textRef.current.value;
     const isDecompositionStage = state === "Decomposition_stage";
-    const userMessage = { id: messageID++, role: "user", text: userText };
+    const userMessage = { id: messageID++, role: "user", content: userText };
     const nextClarifyMessages = [...(clarifyMessages ?? []), userMessage];
     const nextFeedbackMessages = isDecompositionStage
       ? (feedbackMessages ?? [])
@@ -126,7 +126,7 @@ function ChatPanel() {
       }
     }
 
-    const assistantMessage = { id: messageID++, role: "assistant", text: response };
+    const assistantMessage = { id: messageID++, role: "assistant", content: response };
 
     setDisplayedMessages((prev) => [...prev, assistantMessage]);
 
@@ -152,7 +152,7 @@ function ChatPanel() {
       <div className="chat-messages">
         {displayedMessages.map((msg) => (
           <div key={msg.id} className={`chat-bubble ${msg.role}`}>
-            {msg.text}
+            {msg.content}
           </div>
         ))}
       </div>

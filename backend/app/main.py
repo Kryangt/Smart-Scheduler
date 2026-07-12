@@ -295,19 +295,24 @@ def pdf_file_upload_api():
 
 
 class ChatMessage(BaseModel):
+    id: int
     role: Literal["user", "assistant", "system"]
     content: str
 class TaskDecompositeRequest(BaseModel):
-    messages: List[ChatMessage]
+    clarifyMessages: List[ChatMessage]
+    feedbackMessages: Optional[List[ChatMessage]] = []
 
 @app.post("/task-decomposition")
 def decompose_tasks_api(request: Request, payLoad: TaskDecompositeRequest):
-    if(len(payLoad.messages) == 0):
-        return {"No messages detect"}
-    if(payLoad.messages[len(payLoad.messages-1)].role != "user"):
-        return {"Last turn shoudld be user"}
+    messages = payLoad.clarifyMessages
 
-    return ai_assistance_control_center(payLoad)
+    if len(messages) == 0:
+        return {"error": "No messages detected"}
+
+    if messages[-1].role != "user":
+        return {"error": "Last turn should be user"}
+
+    return ai_assistance_control_center(messages)
 
 @app.get("/test-db")
 def test_db_api():
