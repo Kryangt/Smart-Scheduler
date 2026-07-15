@@ -353,9 +353,9 @@ def handle_task_confirmation(cred, decision, messages, structured_tasks, feedbac
 def handle_task_schedule(cred, structured_tasks):
     scheduler_ready_tasks = [
         {
-            "title": task["title"],
-            "estimated_duration": task["estimated_duration_minutes"],
-            "deadline": task["deadline"]
+            "title": task.title,
+            "estimated_duration": task.estimated_duration_minutes,
+            "deadline": task.deadline
         }
         for task in structured_tasks.get("sub_tasks", [])
     ]

@@ -179,7 +179,8 @@ def schedule(creds, tasks):
             scheduled.append({
                 "title": task_title,
                 "start": start_time.isoformat(),
-                "end": end_time.isoformat()
+                "end": end_time.isoformat(),
+                "estimated_duration": task_duration * 60
             })
             
             free_intervals[slot_index] = (end_time, free_slot[1])

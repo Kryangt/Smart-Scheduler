@@ -1,6 +1,10 @@
 from datetime import datetime
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from backend.app.models import Task, Scheduled_Blocks
+    
+from datetime import datetime
+
 import httplib2
 import google_auth_httplib2
 # def get_calendar_service(creds):
@@ -46,7 +50,7 @@ def get_events(creds, end_time=None):
 
     return {"events": all_events}
 
-def create_event(creds, calendar: str = None, date: str = None, start: str = None, end: str = None, summary: str = None):
+def create_event(creds, user, db, calendar: str = None, date: str = None, start: str = None, end: str = None, summary: str = None, estimated_duration: int = 0):
 
     service = get_calendar_service(creds)
     if summary is None:
@@ -68,4 +72,27 @@ def create_event(creds, calendar: str = None, date: str = None, start: str = Non
         body=event
     ).execute()
 
+    event = Task(
+        user_id=user.id,
+        title=summary,
+        estimated_duration=estimated_duration,
+        task_type="Not defined yet",
+        priority=0,
+        status="unfinished",
+        created_time=datetime.now(),
+        updated_time=datetime.now(),
+    )
+
+    db.add(event)
+
+    scheduled_blocks = Scheduled_Blocks(
+        user_id = user.id,
+        task_id = event.id,
+        start_time = start,
+        end_time = end,
+        status = "scheduled",
+        created_at = datetime.now(),
+    )
+    db.add(scheduled_blocks)
+    db.commit()
     return {"event": created_event}

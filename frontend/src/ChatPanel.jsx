@@ -24,7 +24,15 @@ function ChatPanel() {
 ]  )
   const [clarifyMessages, setClarifyMessages] = useState(null)
   const [feedbackMessages, setFeedbackMessages] = useState(null)
-  const [state, setState] = useState("Decomposition_stage");
+  const STAGE = {
+    DECOMPOSITION: "decomposition",
+    WAIT_CONFIRMATION: "wait_confirmation",
+    FEEDBACK: "feedback"
+  };
+  
+  const [stage, setStage] = useState(STAGE.DECOMPOSITION);
+
+
   const [subTasks, setSubTasks] = useState(null)
   const openPicker = () => {
     fileRef.current?.click();
@@ -54,26 +62,24 @@ function ChatPanel() {
     if (!enabled || !textRef.current) return;
 
     const userText = textRef.current.value;
-    const isDecompositionStage = state === "Decomposition_stage";
+    const isFeedbackStage = stage === STAGE.FEEDBACK;    
     const userMessage = { id: messageID++, role: "user", content: userText };
-    const nextClarifyMessages = [...(clarifyMessages ?? []), userMessage];
-    const nextFeedbackMessages = isDecompositionStage
-      ? (feedbackMessages ?? [])
-      : [...(feedbackMessages ?? []), userMessage];
+    const nextClarifyMessages = !isFeedbackStage? [...(clarifyMessages ?? []), userMessage] : [clarifyMessages ?? []];    
+    const nextFeedbackMessages = isFeedbackStage
+    ? [...(feedbackMessages ?? []), userMessage] : (feedbackMessages ?? []);
 
-    if (isDecompositionStage) {
-      setClarifyMessages(nextClarifyMessages);
-    } else {
-      setFeedbackMessages(nextFeedbackMessages);
-    }
 
-    const requestBody = isDecompositionStage
-      ? { clarifyMessages: nextClarifyMessages }
-      : {
-          clarifyMessages: nextClarifyMessages,
-          feedbackMessages: nextFeedbackMessages
-        };
+    setFeedbackMessages(nextFeedbackMessages);
+    setClarifyMessages(nextClarifyMessages);
 
+    const requestBody = !isFeedbackStage
+    ? {
+        clarifyMessages: nextClarifyMessages
+      }
+    : {
+        clarifyMessages: nextClarifyMessages,
+        feedbackMessages: nextFeedbackMessages
+      };
     const fetchResponse = await fetch(`${API_BASE}/task-decomposition`, {
       method: "POST",
       credentials: "include",
@@ -121,22 +127,68 @@ function ChatPanel() {
         ...subTaskLines
       ].join("\n");
 
-      if (data.state === "decomposed") {
-        setState("feedBack_stage");
-      }
+      setStage(STAGE.WAIT_CONFIRMATION);
     }
 
     const assistantMessage = { id: messageID++, role: "assistant", content: response };
 
     setDisplayedMessages((prev) => [...prev, assistantMessage]);
 
-    if (isDecompositionStage) {
-      setClarifyMessages((prev) => [...(prev ?? []), assistantMessage]);
-    } else {
-      setFeedbackMessages((prev) => [...(prev ?? []), assistantMessage]);
+    if (isFeedbackStage)
+    {
+      setFeedbackMessages(prev => [...(prev ?? []),assistantMessage]);
+    }else
+    {
+      setClarifyMessages(prev => [...(prev ?? []),assistantMessage]);
     }
   };
 
+  const handleImprove = () => {
+    setStage(STAGE.FEEDBACK);
+    if (textRef.current) {
+      textRef.current.value = "";
+  }
+
+  setEnabled(false);
+  };
+
+  const handleConfirm = async () => {
+    const response = await fetch(
+        `${API_BASE}/task-confirmation`,
+        {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                decision: "yes",
+                structuredTasks: subTasks
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    setDisplayedMessages(prev => [
+        ...prev,
+        {
+            id: messageID++,
+            role: "assistant",
+            content: "Great! Your tasks have been scheduled."
+        }
+    ]);
+
+    setStage(STAGE.DECOMPOSITION);
+    setClarifyMessages(null);
+    setFeedbackMessages(null);
+    setSubTasks(null);
+    setEnabled(false);
+
+    if (textRef.current) {
+        textRef.current.value = "";
+    }
+  }
   const handleTextChange = () =>{
     if (textRef.current && textRef.current.value.trim() !== "")
     {
@@ -146,6 +198,8 @@ function ChatPanel() {
       setEnabled(false)
     }
   }
+
+  
   return (
     <section className="chat-panel">
       <header className="chat-header">Assistant</header>
@@ -176,10 +230,37 @@ function ChatPanel() {
         </button>
       </div>
 
-      <form className="chat-input" onSubmit={(e) => e.preventDefault()}>
-        <input ref = {textRef} onChange = {handleTextChange} type="text" placeholder="Type a message..." />
-        <button type="button" disabled = {!enabled} onClick = {handleSend}>Send</button>
-      </form>
+      {stage !== STAGE.WAIT_CONFIRMATION && (
+        <form className="chat-input" onSubmit={(e) => e.preventDefault()}>
+            <input
+                ref={textRef}
+                onChange={handleTextChange}
+                type="text"
+                placeholder="Type a message..."
+            />
+
+            <button
+                type="button"
+                disabled={!enabled}
+                onClick={handleSend}
+            >
+                Send
+            </button>
+        </form>
+      )}
+
+      {stage === STAGE.WAIT_CONFIRMATION && (
+        <div className="confirmation-panel">
+            <button onClick={handleConfirm}>
+                Confirm
+            </button>
+
+            <button onClick={handleImprove}>
+                Improve
+            </button>
+        </div>
+      )}
+
     </section>
   );
 }

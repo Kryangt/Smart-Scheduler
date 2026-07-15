@@ -9,6 +9,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
 
     email = Column(String, unique=True, nullable=False)
+    google_sub = Column(String, unique = True, nullable=False)
     age = Column(Integer)
     occupation = Column(String)
 

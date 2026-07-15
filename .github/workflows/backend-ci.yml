@@ -29,5 +29,5 @@ jobs:
           pip install pytest
 
       # Step 4: Run tests
-      - name: Run backend tests
+      - name: Run backend test
         run: PYTHONPATH=. pytest -v --maxfail=1 --disable-warnings

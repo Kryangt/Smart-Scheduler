@@ -17,7 +17,7 @@ class Task(Base):
     priority = Column(Integer)
     status = Column(String)
     created_time = Column(DateTime)
-    uodated_time = Column(DateTime)
+    updated_time = Column(DateTime)
 
     user = relationship("User", back_populates="tasks") #given a task, return all users objects related to this task, need to define foriegn keys
     schedule_blocks = relationship("ScheduleBlock", back_populates="task")
