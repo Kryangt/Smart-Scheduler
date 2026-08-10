@@ -1,10 +1,11 @@
 from fastapi.testclient import TestClient
 from google.oauth2.credentials import Credentials
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app.database.connection import get_db
-from backend.app.main import app, get_current_user
+from backend.app.main import _events_retrive, app, get_current_user
 
 client = TestClient(app)
 
@@ -18,6 +19,35 @@ def fake_credentials():
         client_secret="fake",
         scopes=[]
     )
+
+
+def test_database_events_are_serialized_for_the_frontend():
+    task = SimpleNamespace(
+        id=12,
+        title="Prepare presentation",
+        earlist_start_time=datetime(2026, 8, 15, 9, 0),
+        deadline=datetime(2026, 8, 15, 10, 30),
+        priority=1,
+        status="scheduled",
+        estimated_duration=90,
+    )
+    scalar_result = SimpleNamespace(all=lambda: [task])
+    db = SimpleNamespace(scalars=lambda statement: scalar_result)
+
+    result = _events_retrive(userId=7, db_session=db)
+
+    assert result == {
+        "events": [{
+            "id": "database-task-12",
+            "summary": "Prepare presentation",
+            "start": {"dateTime": "2026-08-15T09:00:00"},
+            "end": {"dateTime": "2026-08-15T10:30:00"},
+            "priority": "medium",
+            "source": "database",
+            "status": "scheduled",
+            "estimated_duration": 90,
+        }]
+    }
 
 
 @patch("backend.app.main.get_session_credentials")

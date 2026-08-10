@@ -22,8 +22,9 @@ from typing import Literal, List, Any
 #database part
 from backend.app.database.connection import get_connection, get_db
 from backend.app.models.User import User
+from backend.app.models.Task import Task
 from sqlalchemy.orm import Session
-
+from sqlalchemy import select
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -360,7 +361,7 @@ def callback(request: Request, db: Session = Depends(get_db)):
     
     db.commit()
     db.refresh(user)
-    
+
     save_session(
         session_id=session_id,
         user_id=user.id,
@@ -382,6 +383,44 @@ def callback(request: Request, db: Session = Depends(get_db)):
 
     return response
 
+def _events_retrive(userId, db_session):
+    """Return a user's scheduled database tasks in the frontend event format."""
+    stmt = (
+        select(Task)
+        .where(
+            Task.user_id == userId,
+            Task.earlist_start_time.is_not(None),
+            Task.deadline.is_not(None),
+        )
+        .order_by(Task.earlist_start_time)
+    )
+    tasks = db_session.scalars(stmt).all()
+    priority_labels = {0: "high", 1: "medium", 2: "low"}
+
+    return {
+        "events": [
+            {
+                "id": f"database-task-{task.id}",
+                "summary": task.title or "Untitled task",
+                "start": {
+                    "dateTime": task.earlist_start_time.isoformat(),
+                },
+                "end": {
+                    "dateTime": task.deadline.isoformat(),
+                },
+                "priority": priority_labels.get(task.priority, "medium"),
+                "source": "database",
+                "status": task.status,
+                "estimated_duration": task.estimated_duration,
+            }
+            for task in tasks
+        ]
+    }
+
+@app.get("/initial")
+def initialization(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    events = _events_retrive(user.id, db)
+    return events
 
 @app.get("/events")
 def get_events_api(request: Request):

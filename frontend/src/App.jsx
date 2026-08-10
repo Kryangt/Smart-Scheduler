@@ -134,14 +134,62 @@ function App() {
   const [taskForm, setTaskForm] = useState({ title: "", deadline: "", duration: "", priority: "medium" });
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+  
+    fetch(`${API_BASE}/events`, {
+      credentials: "include"
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load events");
+        return response.json();
+      })
+      .then((data) => setEvents(normalizeEvents(data)))
+      .catch((error) => setNotice(error.message));
+  }, [isAuthenticated]);
+  
+  useEffect(() => {
     let active = true;
-    fetch(`${API_BASE}/auth/status`, { credentials: "include" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (active) setIsAuthenticated(Boolean(data?.authenticated)); })
-      .catch(() => { if (active) setIsAuthenticated(false); });
-    return () => { active = false; };
+  
+    async function initializeApp() {
+      try {
+        const authResponse = await fetch(`${API_BASE}/auth/status`, {
+          credentials: "include",
+        });
+        if (!authResponse.ok) {
+          throw new Error("Authentication check failed");
+        }
+        const authData = await authResponse.json();
+  
+        if (!authData.authenticated) {
+          if (active) setIsAuthenticated(false);
+          return;
+        }
+        if (active) setIsAuthenticated(true);
+        const initialResponse = await fetch(`${API_BASE}/initial`, {
+          credentials: "include",
+        });
+  
+        if (!initialResponse.ok) {
+          throw new Error("Failed to initialize application");
+        }
+        const initialData = await initialResponse.json();
+        const initialEvents = normalizeEvents(initialData);
+        if (active) {
+          setEvents(initialEvents);
+        }
+      } catch (error) {
+        console.error("Application initialization failed:", error);
+        if (active) {
+          setIsAuthenticated(false);
+          setEvents([]);
+        }
+      }
+    }
+    initializeApp();
+    return () => {
+      active = false;
+    };
   }, []);
-
   const getEvents = async () => {
     try {
       const response = await fetch(`${API_BASE}/events`, { credentials: "include" });

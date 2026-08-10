@@ -150,9 +150,13 @@ def create_event(
 
     return created_event
 
-
+"""
+Enabled multiple requests --> Improve performance
+Separete events requests into batches, and send each batch to google calendar
+If failed, delete all previously successed scheduled events
+If successed, commit all events to db
+"""
 def create_events_batch(creds, user, db, calendar, event_specs):
-    """Create independent Calendar events in batches and persist them in one DB transaction."""
     if not event_specs:
         return []
 
