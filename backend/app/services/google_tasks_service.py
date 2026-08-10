@@ -1,7 +1,6 @@
-from fastapi.responses import JSONResponse
+from fastapi import HTTPException
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from backend.app.models import Task
 
 def get_tasks_service(creds):
     return build("tasks", "v1", credentials=creds)
@@ -15,7 +14,7 @@ def get_tasks_list(creds):
     showHidden=False
     ).execute().get("items", [])
 
-    return {"Tasks": tasks}
+    return tasks
 
 
 def create_task(creds, user, db, title: str = None, date: str = None, due: str = None):
@@ -34,7 +33,10 @@ def create_task(creds, user, db, title: str = None, date: str = None, due: str =
             body=task
         ).execute()
         
-        return {"task": created_task}
+        return created_task
     except HttpError as e:
-        return JSONResponse(status_code=400, content={"error": "Google Tasks API error", "details": str(e)})
+        raise HTTPException(
+            status_code=502,
+            detail=f"Google Tasks API error: {e}",
+        ) from e
 

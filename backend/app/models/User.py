@@ -8,6 +8,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
 
+    name = Column(String, unique = False, nullable=False)
     email = Column(String, unique=True, nullable=False)
     google_sub = Column(String, unique = True, nullable=False)
     age = Column(Integer)
@@ -21,5 +22,5 @@ class User(Base):
 
     # relationships
     tasks = relationship("Task", back_populates="user")
-    schedule_blocks = relationship("ScheduleBlock", back_populates="user")
+    schedule_blocks = relationship("Scheduled_Blocks", back_populates="user")
     action_logs = relationship("ActionLog", back_populates="user")

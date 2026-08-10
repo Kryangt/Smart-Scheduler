@@ -2,7 +2,15 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from backend.app.services.scheduler_service import schedule
+import json
 
+import os
+
+VPN_PORT = "7897"
+os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
 
 _client = None
 def getAIClient():
@@ -13,7 +21,28 @@ def getAIClient():
         if API_KEY:
             _client = OpenAI(api_key = API_KEY)
     
+    if _client is None:
+        raise RuntimeError("AI_API_KEY is not configured")
     return _client
+
+
+def _response_payload(response):
+    parsed = getattr(response, "output_parsed", None)
+    if parsed is not None:
+        return parsed.model_dump() if hasattr(parsed, "model_dump") else parsed
+    return json.loads(response.output_text)
+
+
+def _task_dict(task):
+    if hasattr(task, "model_dump"):
+        return task.model_dump()
+    return dict(task)
+
+
+def _task_list(structured_tasks):
+    if isinstance(structured_tasks, dict):
+        structured_tasks = structured_tasks.get("sub_tasks", [])
+    return [_task_dict(task) for task in structured_tasks]
 #More structured layers of ai assistant workflow: input user prompt
 #STATE 1: Validate
 #STATE 2: Clarify
@@ -97,6 +126,8 @@ def _clarification_layer(messages, latest_user_message):
             "You are the clarification layer for task planning. "
             "Review the conversation and decide whether there is enough information to plan the task. "
             "A task is clear only if you can identify the user's intended deliverable, relevant deadline or time target, important constraints, and any required tools or resources. "
+            "You have to be very careful about what task needs to be clarify. Because we have to calculate the time needed for each task, you should know any specific information about the task"
+            "Including location, time zone, book name, etc. But don't be extremely strict. If you are confident that you can give a relatively accurate task planning based on given infomation, then don't need further clarification"
             "You must fill every output property according to its purpose: "
             "'status' must be either 'clear' or 'needs_clarification'; "
             "'clarified_task' must be a concise restatement of the user's actual goal; "
@@ -182,15 +213,25 @@ def _clarification_layer(messages, latest_user_message):
             }
         }
     )
-    return response.output_parsed
+    return _response_payload(response)
 
 def _decomposition_layer(clarification_result, messages):
     clarified_task = clarification_result["clarified_task"]
     known_info = clarification_result["known_info"]
     client = getAIClient()
+
+    developer_content = "\n".join([
+    "The following information has already been clarified through previous conversations with the user:",
+    f"Final goal: {clarified_task}",
+    f"Deliverable: {known_info.get('deliverable', '')}",
+    f"Deadline: {known_info.get('deadline', '')}",
+    f"Constraints: {', '.join(known_info.get('constraints', []))}",
+    f"Tools needed: {', '.join(known_info.get('tools_needed', []))}"
+    ])
+
     response = client.responses.create(
-        model = "gpt-5.3-chat-latest",
-        reasoning= {"effort": "high"},
+        model="gpt-5.6",
+        reasoning={"effort": "high"},
         instructions=(
             "You are the decomposition layer for task planning. "
             "Break the clarified task into a small set of concrete, actionable sub_tasks needed to complete the final deliverable. "
@@ -207,14 +248,7 @@ def _decomposition_layer(clarification_result, messages):
         input = (
             {
                 "role" : "developer",
-                "content":[
-                    "The following information has already been clarified through previous conversations with the user:",
-                    "Final goal" + clarified_task,
-                    *[
-                        string
-                        for string in known_info
-                    ]
-                ]
+                "content":developer_content
             },
             {
                 "role": "developer",
@@ -249,18 +283,18 @@ def _decomposition_layer(clarification_result, messages):
                                 "deadline": { "type": "string" },
                                 "reason": { "type": "string" }
                                 },
-                                "required": ["deliverable", "estimated_duration", "deadline", "reason"],
+                                "required": ["deliverable", "estimated_duration_minutes", "deadline", "reason"],
                                 "additionalProperties": False
                             }
                             }
                         },
-                        "required": ["sub_tasks"],
+                        "required": ["status", "sub_tasks"],
                         "additionalProperties": False
                     }
             }
         }
     )
-    return response.output_parsed
+    return _response_payload(response)
 def _structuring_layer(decomposed_task):
     decomposition_result = decomposed_task
     sub_tasks = decomposition_result.get("sub_tasks", [])
@@ -333,13 +367,13 @@ def _structuring_layer(decomposed_task):
                             }
                         }
                     },
-                    "required": ["sub_tasks"],
+                    "required": ["status", "sub_tasks"],
                     "additionalProperties": False
                 }
             }
         }
     )
-    return response.output_parsed
+    return _response_payload(response)
 
 def handle_task_confirmation(cred, decision, messages, structured_tasks, feedback):
     if(decision == "yes"):
@@ -353,20 +387,25 @@ def handle_task_confirmation(cred, decision, messages, structured_tasks, feedbac
 def handle_task_schedule(cred, structured_tasks):
     scheduler_ready_tasks = [
         {
-            "title": task.title,
-            "estimated_duration": task.estimated_duration_minutes,
-            "deadline": task.deadline
+            "title": task["title"],
+            "estimated_duration": (task.get("estimated_duration_minutes") or 60) / 60,
+            "deadline": task["deadline"],
+            "priority": task.get("priority", "medium"),
+            "depends_on": task.get("depends_on", []),
         }
-        for task in structured_tasks.get("sub_tasks", [])
+        for task in _task_list(structured_tasks)
     ]
-    schedule(cred, scheduler_ready_tasks)
-    return {"status": "finish task decomposition cycle"}
+    schedule_result = schedule(cred, scheduler_ready_tasks)
+    return {
+        "status": "scheduled",
+        "schedule": schedule_result,
+    }
 
 def handle_feedback_improvement(messages, structured_tasks, feedbacks):
     if not feedbacks:
         return {"status": "error", "message": "Feedback is required for task improvement"}
 
-    current_sub_tasks = structured_tasks.get("sub_tasks", [])
+    current_sub_tasks = _task_list(structured_tasks)
     client = getAIClient()
     response = client.responses.create(
         model="gpt-5.5",
@@ -444,11 +483,11 @@ def handle_feedback_improvement(messages, structured_tasks, feedbacks):
                             }
                         }
                     },
-                    "required": ["sub_tasks"],
+                    "required": ["status", "sub_tasks"],
                     "additionalProperties": False
                 }
             }
         }
     )
-    return response.output_parsed
+    return _response_payload(response)
 

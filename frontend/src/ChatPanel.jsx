@@ -1,267 +1,108 @@
-import { useRef, useState } from "react";
-import "./App.css";
-
-let messageID = 2;
-// let demoMessages = [
-//   { id: 1, role: "bot", text: "Hi! How can I help you today?" },
-//   { id: 2, role: "user", text: "I want to schedule my tasks." },
-//   { id: 3, role: "bot", text: "Great. Add tasks and I will find open time slots." }
-// ];
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
+const STAGE = { DECOMPOSITION: "decomposition", WAIT_CONFIRMATION: "wait_confirmation", FEEDBACK: "feedback" };
 
-function ChatPanel() {
-  const fileRef = useRef(null);
+function ChatPanel({ onDraftTasks, onTasksConfirmed }) {
+  const nextId = useRef(2);
   const textRef = useRef(null);
-  const [file, setFile] = useState(null);
-  const [enabled, setEnabled] = useState(false);
-  const [displayedMessages, setDisplayedMessages] = useState([
-    {
-      id: 1, 
-      role: "assistant", 
-      content: "Hi! How can I help you today?" 
-    }
-]  )
-  const [clarifyMessages, setClarifyMessages] = useState(null)
-  const [feedbackMessages, setFeedbackMessages] = useState(null)
-  const STAGE = {
-    DECOMPOSITION: "decomposition",
-    WAIT_CONFIRMATION: "wait_confirmation",
-    FEEDBACK: "feedback"
-  };
-  
+  const messageEndRef = useRef(null);
+  const [messages, setMessages] = useState([{ id: 1, role: "assistant", content: "Hi! Tell me what you need to accomplish, and I’ll turn it into a realistic plan." }]);
+  const [clarifyMessages, setClarifyMessages] = useState([]);
+  const [feedbackMessages, setFeedbackMessages] = useState([]);
+  const [subTasks, setSubTasks] = useState([]);
   const [stage, setStage] = useState(STAGE.DECOMPOSITION);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [input, setInput] = useState("");
 
+  useEffect(() => {
+    if (typeof messageEndRef.current?.scrollIntoView === "function") {
+      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isGenerating]);
 
-  const [subTasks, setSubTasks] = useState(null)
-  const openPicker = () => {
-    fileRef.current?.click();
-  };
-
-  const handleFileChange = (e) => {
-    setFile(e.target.files?.[0] ?? null);
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-
-    const form = new FormData();
-    form.append("pdfFile", file);
+  const send = async (event) => {
+    event?.preventDefault();
+    const userText = input.trim();
+    if (!userText || isGenerating) return;
+    const userMessage = { id: nextId.current++, role: "user", content: userText };
+    const isFeedback = stage === STAGE.FEEDBACK;
+    const nextClarify = isFeedback ? clarifyMessages : [...clarifyMessages, userMessage];
+    const nextFeedback = isFeedback ? [...feedbackMessages, userMessage] : feedbackMessages;
+    setMessages((current) => [...current, userMessage]);
+    setClarifyMessages(nextClarify);
+    setFeedbackMessages(nextFeedback);
+    setInput("");
+    setIsGenerating(true);
 
     try {
-      await fetch("/upload", {
+      const response = await fetch(`${API_BASE}/${isFeedback ? "task-confirmation" : "task-decomposition"}`, {
         method: "POST",
-        body: form
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isFeedback ? { decision: "no", structured_tasks: subTasks, clarifyMessages: nextClarify, feedbackMessages: nextFeedback } : { clarifyMessages: nextClarify })
       });
-    } catch (err) {
-      // UI-only for now; if you want, we can show error status in the panel.
-    }
-  };
-
-  const handleSend = async () => {
-    if (!enabled || !textRef.current) return;
-
-    const userText = textRef.current.value;
-    const isFeedbackStage = stage === STAGE.FEEDBACK;    
-    const userMessage = { id: messageID++, role: "user", content: userText };
-    const nextClarifyMessages = !isFeedbackStage? [...(clarifyMessages ?? []), userMessage] : [clarifyMessages ?? []];    
-    const nextFeedbackMessages = isFeedbackStage
-    ? [...(feedbackMessages ?? []), userMessage] : (feedbackMessages ?? []);
-
-
-    setFeedbackMessages(nextFeedbackMessages);
-    setClarifyMessages(nextClarifyMessages);
-
-    const requestBody = !isFeedbackStage
-    ? {
-        clarifyMessages: nextClarifyMessages
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
+      const data = await response.json();
+      let content;
+      if (data.status === "needs_clarification") {
+        const questions = data.questions ?? [];
+        content = questions.length ? `I need a little more detail:\n${questions.map((question, index) => `${index + 1}. ${question}`).join("\n")}` : "Could you share a little more detail?";
+      } else {
+        const drafts = (data.sub_tasks ?? []).map((task) => ({
+          title: task.title ?? task.deliverable ?? "Untitled task",
+          deadline: task.deadline ?? "",
+          estimated_duration_minutes: task.estimated_duration_minutes ?? 60,
+          reason: task.reason ?? "",
+          depends_on: task.depends_on ?? [],
+          priority: task.priority ?? "medium"
+        }));
+        setSubTasks(drafts);
+        onDraftTasks?.(drafts);
+        setStage(STAGE.WAIT_CONFIRMATION);
+        content = `I drafted ${drafts.length} task${drafts.length === 1 ? "" : "s"}. They’re now in your waiting queue—review them there or confirm the plan below.`;
       }
-    : {
-        clarifyMessages: nextClarifyMessages,
-        feedbackMessages: nextFeedbackMessages
-      };
-    const fetchResponse = await fetch(`${API_BASE}/task-decomposition`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody)
-    });
-    const data = await fetchResponse.json();
-
-    textRef.current.value = "";
-    setEnabled(false);
-
-    let response = "";
-
-    if (data.state === "need_clarification") {
-      const knownInfo = (data.known_info ?? []).join("\n");
-      const questionList = (data.questions ?? []).join("\n");
-      response = [
-        "Here are the information I known about your task",
-        knownInfo,
-        "And I still have some questions about the tasks, if you can, please answer them, that will be very helpful in decomposing your task",
-        questionList
-      ]
-        .filter(Boolean)
-        .join("\n");
-    } else {
-      const nextSubTasks = (data.sub_task ?? []).map((task) => ({
-        title: task.deliverable,
-        deadline: task.deadline,
-        estimated_duration: task.estimated_duration_minutes
-      }));
-
-      setSubTasks(nextSubTasks);
-
-      const subTaskLines = (data.sub_task ?? []).map(
-        (task) =>
-          `Task objective: ${task.deliverable}, Estimated_duration (mins): ${task.estimated_duration_minutes}, Expected_deadline: ${task.deadline}, Reason: ${task.reason}`
-      );
-
-      response = [
-        data.state === "decomposed"
-          ? "The following are the drafted sub-tasks"
-          : "The following are the improved version of sub-tasks",
-        ...subTaskLines
-      ].join("\n");
-
-      setStage(STAGE.WAIT_CONFIRMATION);
-    }
-
-    const assistantMessage = { id: messageID++, role: "assistant", content: response };
-
-    setDisplayedMessages((prev) => [...prev, assistantMessage]);
-
-    if (isFeedbackStage)
-    {
-      setFeedbackMessages(prev => [...(prev ?? []),assistantMessage]);
-    }else
-    {
-      setClarifyMessages(prev => [...(prev ?? []),assistantMessage]);
-    }
+      const assistant = { id: nextId.current++, role: "assistant", content };
+      setMessages((current) => [...current, assistant]);
+      if (isFeedback) setFeedbackMessages((current) => [...current, assistant]);
+      else setClarifyMessages((current) => [...current, assistant]);
+    } catch (error) {
+      setMessages((current) => [...current, { id: nextId.current++, role: "assistant", content: `I couldn’t finish that request. ${error.message}. Please try again.` }]);
+    } finally { setIsGenerating(false); }
   };
 
-  const handleImprove = () => {
-    setStage(STAGE.FEEDBACK);
-    if (textRef.current) {
-      textRef.current.value = "";
-  }
-
-  setEnabled(false);
+  const confirm = async () => {
+    if (!subTasks.length || isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch(`${API_BASE}/task-confirmation`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "yes", structured_tasks: subTasks, clarifyMessages, feedbackMessages })
+      });
+      if (!response.ok) throw new Error(`Confirmation failed (${response.status})`);
+      const data = await response.json();
+      onTasksConfirmed?.(data, subTasks);
+      setMessages((current) => [...current, { id: nextId.current++, role: "assistant", content: "Done—your confirmed tasks have been moved into the schedule." }]);
+      setStage(STAGE.DECOMPOSITION);
+      setClarifyMessages([]);
+      setFeedbackMessages([]);
+      setSubTasks([]);
+    } catch (error) {
+      setMessages((current) => [...current, { id: nextId.current++, role: "assistant", content: `I couldn’t confirm the plan. ${error.message}.` }]);
+    } finally { setIsGenerating(false); }
   };
 
-  const handleConfirm = async () => {
-    const response = await fetch(
-        `${API_BASE}/task-confirmation`,
-        {
-            method: "POST",
-            credentials: "include",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                decision: "yes",
-                structuredTasks: subTasks
-            })
-        }
-    );
-
-    const data = await response.json();
-
-    setDisplayedMessages(prev => [
-        ...prev,
-        {
-            id: messageID++,
-            role: "assistant",
-            content: "Great! Your tasks have been scheduled."
-        }
-    ]);
-
-    setStage(STAGE.DECOMPOSITION);
-    setClarifyMessages(null);
-    setFeedbackMessages(null);
-    setSubTasks(null);
-    setEnabled(false);
-
-    if (textRef.current) {
-        textRef.current.value = "";
-    }
-  }
-  const handleTextChange = () =>{
-    if (textRef.current && textRef.current.value.trim() !== "")
-    {
-      setEnabled(true)
-    }else
-    {
-      setEnabled(false)
-    }
-  }
-
-  
   return (
-    <section className="chat-panel">
-      <header className="chat-header">Assistant</header>
+    <aside className="chat-panel">
+      <header className="chat-header"><div className="assistant-icon">✦</div><div><strong>Planning assistant</strong><span><i className="online-dot"/> Online</span></div></header>
       <div className="chat-messages">
-        {displayedMessages.map((msg) => (
-          <div key={msg.id} className={`chat-bubble ${msg.role}`}>
-            {msg.content}
-          </div>
-        ))}
+        {messages.map((message) => <div className={`message-row ${message.role}`} key={message.id}>{message.role === "assistant" && <span className="mini-assistant">✦</span>}<div className="chat-bubble">{message.content}</div></div>)}
+        {isGenerating && <div className="message-row assistant generating" aria-label="AI is generating a response"><span className="mini-assistant">✦</span><div className="chat-bubble"><span className="thinking-label">Building your plan</span><span className="typing-dots"><i/><i/><i/></span></div></div>}
+        <div ref={messageEndRef}/>
       </div>
-
-      <div className="chat-upload">
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".pdf"
-          onChange={handleFileChange}
-          style={{ display: "none" }}
-        />
-        <button type="button" onClick={openPicker}>
-          Choose PDF
-        </button>
-        <span className="chat-file-name">
-          {file ? file.name : "No file selected"}
-        </span>
-        <button type="button" onClick={handleUpload} disabled={!file}>
-          Upload
-        </button>
-      </div>
-
-      {stage !== STAGE.WAIT_CONFIRMATION && (
-        <form className="chat-input" onSubmit={(e) => e.preventDefault()}>
-            <input
-                ref={textRef}
-                onChange={handleTextChange}
-                type="text"
-                placeholder="Type a message..."
-            />
-
-            <button
-                type="button"
-                disabled={!enabled}
-                onClick={handleSend}
-            >
-                Send
-            </button>
-        </form>
-      )}
-
-      {stage === STAGE.WAIT_CONFIRMATION && (
-        <div className="confirmation-panel">
-            <button onClick={handleConfirm}>
-                Confirm
-            </button>
-
-            <button onClick={handleImprove}>
-                Improve
-            </button>
-        </div>
-      )}
-
-    </section>
+      {stage === STAGE.WAIT_CONFIRMATION ? <div className="confirmation-panel"><div><strong>Draft ready</strong><span>{subTasks.length} tasks waiting for approval</span></div><button className="primary-button" onClick={confirm} disabled={isGenerating}>Confirm plan</button><button className="secondary-button" onClick={() => { setStage(STAGE.FEEDBACK); setTimeout(() => textRef.current?.focus(), 0); }}>Make changes</button></div> : <form className="chat-input" onSubmit={send}><textarea ref={textRef} rows="2" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) send(event); }} placeholder={stage === STAGE.FEEDBACK ? "Tell me what to change…" : "Ask me to plan your tasks…"}/><button aria-label="Send message" disabled={!input.trim() || isGenerating}>↑</button></form>}
+      <p className="chat-hint">AI can make mistakes. Review tasks before confirming.</p>
+    </aside>
   );
 }
 

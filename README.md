@@ -17,3 +17,20 @@ The scheduler is synchronized with google calendar, so users can create tasks, a
 
 ## How to use
 - The web application is still under development and does not support public use yet
+
+## Backend setup
+
+Install dependencies and initialize the database explicitly before starting the API:
+
+```powershell
+python -m pip install -r backend/requirements.txt
+python -m backend.app.database.init_db
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8080
+```
+
+For Neon, set `MIGRATION_DATABASE_URL` to the direct (non-`-pooler`) connection
+string before running `init_db`. Continue using the pooled `DATABASE_URL` for
+normal application requests.
+
+Set `OUTBOUND_HTTP_PROXY` only in environments that require an outbound proxy. The
+application no longer assumes a proxy is running on localhost.

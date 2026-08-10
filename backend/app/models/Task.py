@@ -20,5 +20,5 @@ class Task(Base):
     updated_time = Column(DateTime)
 
     user = relationship("User", back_populates="tasks") #given a task, return all users objects related to this task, need to define foriegn keys
-    schedule_blocks = relationship("ScheduleBlock", back_populates="task")
+    schedule_blocks = relationship("Scheduled_Blocks", back_populates="task")
     action_logs = relationship("ActionLog", back_populates="task")

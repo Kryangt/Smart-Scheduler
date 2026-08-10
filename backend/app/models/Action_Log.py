@@ -23,4 +23,4 @@ class ActionLog(Base):
     # relationships
     user = relationship("User", back_populates="action_logs")
     task = relationship("Task", back_populates="action_logs")
-    schedule_block = relationship("ScheduleBlock", back_populates="action_logs")
+    schedule_block = relationship("Scheduled_Blocks", back_populates="action_logs")

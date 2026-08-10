@@ -1,18 +1,11 @@
 import os
-
-VPN_PORT = "7897" 
-os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
-
 import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlsplit, urlunsplit
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from google_auth_oauthlib.flow import Flow
@@ -21,32 +14,36 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from dotenv import load_dotenv
 from backend.app.services.google_tasks_service import create_task, get_tasks_list
-from backend.app.services.google_events_service import get_events, create_event
+from backend.app.services.google_events_service import create_events_batch, get_events
 from backend.app.services.scheduler_service import schedule
 from backend.app.services.ai_assistance_service import ai_assistance_control_center, handle_task_confirmation
 from typing import Literal, List, Any
 
 #database part
-from backend.app.database.base import Base
-from backend.app.database.connection import get_connection, get_engine, get_db
+from backend.app.database.connection import get_connection, get_db
 from backend.app.models.User import User
-from backend.app.models.Task import Task
-from backend.app.models.Scheduled_Blocks import Scheduled_Blocks
-from backend.app.models.Action_Log import ActionLog
 from sqlalchemy.orm import Session
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_DIR / ".env")
 
+outbound_proxy = os.getenv("OUTBOUND_HTTP_PROXY")
+if outbound_proxy:
+    for proxy_variable in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        os.environ[proxy_variable] = outbound_proxy
+
+#Redis database
+from backend.app.services.session_service import save_session, get_session
+
 app = FastAPI()
 
 SCOPES = [
     "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/calendar", 
-    "https://www.googleapis.com/auth/tasks"]
-
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/tasks",
+]
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8080").rstrip("/")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{BACKEND_BASE_URL}/auth/callback")
@@ -62,9 +59,6 @@ DEFAULT_CORS_ORIGINS = [
 
 oauth_state_store = {}
 
-session_store = {}
-
-
 def is_local_redirect_uri() -> bool:
     return GOOGLE_REDIRECT_URI.startswith(("http://localhost", "http://127.0.0.1"))
 
@@ -72,8 +66,6 @@ def is_local_redirect_uri() -> bool:
 if is_local_redirect_uri():
     # OAuth requires HTTPS in production. This exception is only for local dev.
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
-#Base.metadata.create_all(bind=get_engine()) #build databases first
 
 def get_cors_origins() -> List[str]:
     configured = os.getenv("CORS_ORIGINS")
@@ -169,7 +161,7 @@ def get_session_data(request: Request) -> dict[str, Any]:
             detail="User not authenticated",
         )
 
-    session_data = session_store.get(session_id)
+    session_data = get_session(session_id)
 
     if not session_data:
         raise HTTPException(
@@ -212,6 +204,8 @@ class TaskInput(BaseModel):
     title: str
     deadline: str
     estimated_duration: float
+    priority: Literal["high", "medium", "low"] = "medium"
+    depends_on: list[str] = Field(default_factory=list)
 
 class ScheduleRequest(BaseModel):
     tasks: List[TaskInput]
@@ -227,6 +221,38 @@ class CreateTaskRequest(BaseModel):
     title: str
     date: str | None = None
     due: str | None = None
+
+
+def create_events_for_schedule(
+    creds,
+    user: User,
+    db: Session,
+    calendar: str,
+    schedule_result: dict,
+):
+    scheduled_items = schedule_result.get("scheduled", [])
+    if not scheduled_items:
+        return []
+
+    event_specs = []
+    for item in scheduled_items:
+        start_dt = datetime.fromisoformat(item["start"])
+        end_dt = datetime.fromisoformat(item["end"])
+        event_specs.append({
+            "date": start_dt.date().isoformat(),
+            "start": start_dt.strftime("%H:%M"),
+            "end": end_dt.strftime("%H:%M"),
+            "summary": item.get("title", "AI Scheduled Task"),
+            "estimated_duration": item.get("estimated_duration", 0),
+        })
+
+    return create_events_batch(
+        creds,
+        user,
+        db,
+        calendar or "primary",
+        event_specs,
+    )
 
 @app.get("/")
 def root():
@@ -252,6 +278,18 @@ def login(request: Request):
         samesite="none" if COOKIE_SECURE else "lax",
     )
     return response
+
+
+@app.get("/auth/status")
+def auth_status(user: User = Depends(get_current_user)):
+    """Return the signed-in state without making a Google API request."""
+    return {
+        "authenticated": True,
+        "user": {
+            "name": user.name,
+            "email": user.email,
+        },
+    }
 
 
 @app.get("/auth/callback")
@@ -323,11 +361,11 @@ def callback(request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
-    session_store[session_id] = {
-        "user_id": user.id,
-        "credentials": credentials_to_dict(credentials),
-    }
-
+    save_session(
+        session_id=session_id,
+        user_id=user.id,
+        credentials=credentials_to_dict(credentials),
+    )
     response = RedirectResponse(
         url=FRONTEND_URL,
         status_code=302,
@@ -348,20 +386,29 @@ def callback(request: Request, db: Session = Depends(get_db)):
 @app.get("/events")
 def get_events_api(request: Request):
     creds = get_session_credentials(request)
-    all_events = get_events(creds)
-
-    return {"events": all_events}
+    return get_events(creds)
 
 @app.post("/events")
-def create_event_api(request: Request, payload: CreateEventRequest):
+def create_event_api(
+    request: Request,
+    payload: CreateEventRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     creds = get_session_credentials(request)
-    created_event = create_event(
+    created_event = create_events_batch(
         creds,
+        user,
+        db,
         payload.calendar,
-        payload.date,
-        payload.start,
-        payload.end,
-    )
+        [{
+            "date": payload.date,
+            "start": payload.start,
+            "end": payload.end,
+            "summary": "AI Scheduled Task",
+            "estimated_duration": 0,
+        }],
+    )[0]
     return {"event": created_event}
 
 @app.get("/tasks")
@@ -390,28 +437,13 @@ def schedule_tasks_api(request: Request, payload: ScheduleRequest, user: User = 
     tasks = [task.model_dump() for task in payload.tasks]
     schedule_result = schedule(creds, tasks)
 
-    created_events = []
-    for item in schedule_result.get("scheduled", []):
-        start_dt = datetime.fromisoformat(item["start"])
-        end_dt = datetime.fromisoformat(item["end"])
-        date = start_dt.date().isoformat()
-        start_time = start_dt.strftime("%H:%M")
-        end_time = end_dt.strftime("%H:%M")
-        summary = item.get("title", "AI Scheduled Task")
-        estimated_duration = item.get("estimated_duration")
-
-        created_event = create_event(
-            creds,
-            user,
-            db,
-            payload.calendar or "primary",
-            date,
-            start_time,
-            end_time,
-            summary=summary,
-            estimated_duration= estimated_duration
-        )
-        created_events.append(created_event)
+    created_events = create_events_for_schedule(
+        creds,
+        user,
+        db,
+        payload.calendar or "primary",
+        schedule_result,
+    )
 
     return {"schedule": schedule_result, "created_events": created_events}
 
@@ -447,28 +479,40 @@ class StructuredTask(BaseModel):
     estimated_duration_minutes: int | None
     reason: str
     depends_on: list[str]
+    priority: Literal["high", "medium", "low"] = "medium"
 
 
 class TaskConfirmationRequest(BaseModel):
     decision: Literal["yes", "no"]
     structured_tasks: list[StructuredTask]
-    messages: list[ChatMessage] = Field(default_factory=list)
-    feedback: list[ChatMessage] = Field(default_factory=list)
+    clarifyMessages: list[ChatMessage] = Field(default_factory=list)
+    feedbackMessages: list[ChatMessage] = Field(default_factory=list)
 
 @app.post("/task-confirmation")
 def confirm_tasks_api(
     request: Request,
-    payload: TaskConfirmationRequest
+    payload: TaskConfirmationRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     credentials = get_session_credentials(request)
 
-    return handle_task_confirmation(
+    result = handle_task_confirmation(
         cred=credentials,
         decision=payload.decision,
-        messages=payload.messages,
+        messages=payload.clarifyMessages,
         structured_tasks=payload.structured_tasks,
-        feedback=payload.feedback
+        feedback=payload.feedbackMessages,
     )
+    if payload.decision == "yes" and "schedule" in result:
+        result["created_events"] = create_events_for_schedule(
+            credentials,
+            user,
+            db,
+            "primary",
+            result["schedule"],
+        )
+    return result
 
 @app.get("/test-db")
 def test_db_api():
