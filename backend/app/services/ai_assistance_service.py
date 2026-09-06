@@ -5,11 +5,11 @@ from backend.app.services.scheduler_service import schedule
 import json
 
 
-# VPN_PORT = "7897"
-# os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-# os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-# os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
-# os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
+VPN_PORT = "7897"
+os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
+os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
 
 _client = None
 def getAIClient():
@@ -122,19 +122,101 @@ def _clarification_layer(messages, latest_user_message):
         model="gpt-5.5",  # define the model to use
         reasoning={"effort": "low"},
         instructions=(
-            "You are the clarification layer for task planning. "
-            "Review the conversation and decide whether there is enough information to plan the task. "
-            "A task is clear only if you can identify the user's intended deliverable, relevant deadline or time target, important constraints, and any required tools or resources. "
-            "You have to be very careful about what task needs to be clarify. Because we have to calculate the time needed for each task, you should know any specific information about the task"
-            "Including location, time zone, book name, etc. But don't be extremely strict. If you are confident that you can give a relatively accurate task planning based on given infomation, then don't need further clarification"
+            "You are the clarification layer for a task-planning system. "
+
+            "The task is considered sufficiently clear when the following required sections can be determined well enough to create a useful plan: "
+
+            "1. deliverable: the concrete goal or result the user wants to complete. "
+            "2. deadline: the time by which the deliverable should be completed, or a usable time target if no strict deadline exists. "
+            "3. estimated_duration: a reasonable planning estimate of the amount of time needed to complete the deliverable. "
+            "The estimate does not need to be precise. It only needs to be reasonable enough for scheduling. "
+            "4. constraints: additional information that materially affects the deliverable, deadline, or estimated_duration. "
+            "Constraints are not an independent category of miscellaneous details. "
+            "They are dependencies of the other required sections. "
+            "Examples include task scope, location, industry, required format, available resources, travel distance, "
+            "task dependencies, or other information that significantly changes what must be done, when it must be done, "
+            "or how long it is likely to take. "
+
+            "Evaluate the required sections in this order: deliverable, deadline, estimated_duration, then constraints. "
+
+            "For each required section, request clarification only when either of the following is true: "
+            "1. the section cannot be inferred from the conversation with enough confidence to support a useful plan; "
+            "2. missing information would materially change the deliverable, make the deadline unusable, "
+            "or make a reasonable duration estimate impossible. "
+
+            "Do not require the user to fully specify the task scope. "
+            "Real-world task requests are often incomplete. "
+            "If the user's description provides a recognizable task type and a reasonably bounded scope, "
+            "use typical assumptions for comparable tasks and proceed. "
+
+            "Missing details that affect only the precision of the duration estimate should not trigger clarification. "
+            "For example, uncertainty between roughly 2 and 4 hours is normally acceptable for planning. "
+            "Clarification is appropriate when the missing information could change the task from one substantially different scale to another, "
+            "such as from a short task to a multi-day task, or when the actual work cannot be identified at all. "
+
+            "When a required section depends on additional information, first determine whether that information can be reasonably inferred "
+            "from the task type, normal conventions, or the rest of the conversation. "
+            "Ask for clarification only if it cannot be reasonably inferred and the uncertainty materially prevents planning. "
+
+            "Do not ask the user to provide an estimated duration when the system can estimate it from typical comparable tasks. "
+            "Duration estimation is the responsibility of the planning system when sufficient task context exists. "
+
+            "When estimating duration, use the following process: "
+
+            "1. Consider several normal and plausible conditions under which the task could be completed, "
+            "using only the information and constraints already provided by the user. "
+
+            "2. Estimate three values: "
+            "- lower_bound: a relatively fast but realistic completion time; "
+            "- typical_time: the most likely completion time; "
+            "- upper_bound: a relatively slow but still normal completion time. "
+            "Do not include rare extreme cases. "
+
+            "3. Measure the uncertainty using the plausible duration range: "
+            "duration_range = upper_bound - lower_bound. "
+
+            "Also compare the range to the typical duration using: "
+            "relative_range = duration_range / typical_time. "
+
+            "4. Treat the completion time as sufficiently concentrated when BOTH are true: "
+            "- duration_range is no more than 60 minutes; "
+            "- relative_range is no more than 50 percent. "
+
+            "If either threshold is exceeded, the duration is too uncertain for reliable planning. "
+            "Identify which missing condition causes the variation and request clarification about that condition. "
+
+            "5. If the duration is sufficiently concentrated, do not ask for clarification. "
+            "Use the upper_bound as the estimated duration so the schedule includes a conservative time buffer. "
+
+            "Use the following scope rule: "
+            "scope is sufficient when the task category, main deliverable, and approximate amount of work are clear enough "
+            "to generate meaningful subtasks and a reasonable duration estimate. "
+            "Exact item counts, detailed specifications, current progress, data readiness, or preferred implementation choices "
+            "are not required unless they would fundamentally change the workload or deliverable. "
+
+            "Example: the user says, 'Finish my topology homework by next Tuesday, chapter 7 exercises.' "
+            "The deliverable is clear, the deadline is usable, and 'chapter 7 exercises' provides a reasonably bounded scope. "
+            "Even though the exact exercise numbers and current progress are unknown, these details usually affect only the precision of the estimate. "
+            "Estimate the duration using a typical chapter-level homework workload and do not clarify. "
+
+            "Example: the user says, 'Pack up my apartment for move-out by August 25.'"
+            "The deliverable is clear, and the deadline is clear, however, if we follow the thinking process of estimating duration time"
+            "Firstly, the user may pack his/her 1b1b apartment, or a house, or 3b3b apartment. The areas affect the time"
+            "For apartment size, packing time may exponentially change. For example, it make take 2 hours for 1b1b, but 5 hours for 3b3b"
+            "So, it exceed the threshold, you should propose a clarification question about this condition."
+            "In practice, I want you to be more accurate about getting the time under conditions, either searching online or experiences"
+
             "You must fill every output property according to its purpose: "
             "'status' must be either 'clear' or 'needs_clarification'; "
             "'clarified_task' must be a concise restatement of the user's actual goal; "
-            "'known_info' must contain the information already provided in the conversation; "
-            "'missing_info' must list only the critical information that is still missing; "
-            "'questions' must contain the minimum concrete follow-up questions needed to get the missing information. "
-            "If the task is already clear, set 'missing_info' and 'questions' to empty arrays. "
-            "Do not guess missing critical facts, and do not ask unnecessary questions."
+            "'known_info' must contain the currently inferred deliverable, deadline, estimated_duration, and constraints; "
+            "'missing_info' must list only information that still prevents a useful inference of a required section; "
+            "'questions' must contain the minimum concrete follow-up questions needed to resolve missing_info. "
+
+            "If all required sections can be inferred well enough for useful planning, set status to 'clear' "
+            "and set missing_info and questions to empty arrays. "
+            "Do not invent user-specific facts that are not supported by the conversation, "
+            "but reasonable generic assumptions about typical task execution are allowed for planning."
         ),
         input=[
             {
@@ -171,6 +253,9 @@ def _clarification_layer(messages, latest_user_message):
                                 "deliverable": {
                                     "type": ["string", "null"]
                                 },
+                                "estimated_duration_minutes":{
+                                    "type": ["integer", "null"]
+                                },
                                 "deadline": {
                                     "type": ["string", "null"]
                                 },
@@ -178,16 +263,12 @@ def _clarification_layer(messages, latest_user_message):
                                     "type": "array",
                                     "items": {"type": "string"}
                                 },
-                                "tools_needed": {
-                                    "type": "array",
-                                    "items": {"type": "string"}
-                                }
                             },
                             "required": [
                                 "deliverable",
                                 "deadline",
                                 "constraints",
-                                "tools_needed"
+                                "estimated_duration_minutes"
                             ],
                             "additionalProperties": False
                         },

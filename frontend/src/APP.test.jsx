@@ -4,12 +4,23 @@ import App from "./App";
 
 global.fetch = vi.fn();
 
-beforeEach(() => {
-  global.fetch.mockReset();
-  global.fetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+const mockResponse = (data, { ok = true, status = 200 } = {}) => ({
+  ok,
+  status,
+  json: async () => data
 });
 
-test("renders the task sections and calendar views", () => {
+beforeEach(() => {
+  global.fetch.mockReset();
+  global.fetch.mockImplementation((url) => {
+    if (String(url).endsWith("/auth/status")) {
+      return Promise.resolve(mockResponse({ authenticated: false }));
+    }
+    return Promise.resolve(mockResponse({}, { ok: false, status: 500 }));
+  });
+});
+
+test("renders the dashboard for an unauthenticated user", async () => {
   render(<App />);
   expect(screen.getByText("SmartSchedule")).toBeInTheDocument();
   expect(screen.getByText("Waiting to schedule")).toBeInTheDocument();
@@ -18,17 +29,43 @@ test("renders the task sections and calendar views", () => {
   expect(screen.getByRole("button", { name: "week" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "month" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Login" })).toBeInTheDocument();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringMatching(/\/auth\/status$/),
+    { credentials: "include" }
+  );
 });
 
-test("shows the Google avatar after authentication", async () => {
-  global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ authenticated: true }) });
+test("initializes the app and shows the Google avatar after authentication", async () => {
+  global.fetch.mockImplementation((url) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/status")) {
+      return Promise.resolve(mockResponse({ authenticated: true }));
+    }
+    if (requestUrl.endsWith("/initial") || requestUrl.endsWith("/events")) {
+      return Promise.resolve(mockResponse({ events: [] }));
+    }
+    return Promise.resolve(mockResponse({}, { ok: false, status: 500 }));
+  });
+
   render(<App />);
   expect(await screen.findByRole("button", { name: "Google account" })).toHaveTextContent("G");
   expect(screen.queryByRole("button", { name: "Login" })).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/initial$/),
+      { credentials: "include" }
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/events$/),
+      { credentials: "include" }
+    );
+  });
 });
 
-test("adds a waiting task and opens it for editing", () => {
+test("adds a waiting task and opens it for editing", async () => {
   render(<App />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole("button", { name: "+" }));
   fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Finish proposal" } });
   fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-07-25" } });
@@ -41,17 +78,21 @@ test("adds a waiting task and opens it for editing", () => {
 });
 
 test("schedules all waiting tasks with the scheduling API", async () => {
-  global.fetch
-    .mockResolvedValueOnce({ ok: false, json: async () => ({}) })
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+  global.fetch.mockImplementation((url) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/status")) {
+      return Promise.resolve(mockResponse({ authenticated: false }));
+    }
+    if (requestUrl.endsWith("/scheduledtasks")) {
+      return Promise.resolve(mockResponse({
         schedule: {
           scheduled: [{ title: "Finish proposal", start: "2026-07-25T09:00:00", end: "2026-07-25T11:00:00" }],
           unscheduled: []
         }
-      })
-    });
+      }));
+    }
+    return Promise.resolve(mockResponse({}, { ok: false, status: 500 }));
+  });
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "+" }));
   fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Finish proposal" } });
@@ -61,8 +102,11 @@ test("schedules all waiting tasks with the scheduling API", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /Schedule/ }));
 
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  const [url, options] = global.fetch.mock.calls[1];
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringMatching(/\/scheduledtasks$/),
+    expect.objectContaining({ method: "POST" })
+  ));
+  const [url, options] = global.fetch.mock.calls.find(([requestUrl]) => String(requestUrl).endsWith("/scheduledtasks"));
   expect(url).toMatch(/\/scheduledtasks$/);
   expect(JSON.parse(options.body)).toEqual({
     calendar: "primary",
@@ -81,9 +125,16 @@ test("schedules all waiting tasks with the scheduling API", async () => {
 test("syncs API events into the calendar instead of terminal output", async () => {
   const today = new Date();
   const visibleDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  global.fetch
-    .mockResolvedValueOnce({ ok: false, json: async () => ({}) })
-    .mockResolvedValueOnce({ ok: true, json: async () => ({ events: [{ id: "1", summary: "Team review", start: { dateTime: `${visibleDate}T09:00:00` }, end: { dateTime: `${visibleDate}T10:00:00` } }] }) });
+  global.fetch.mockImplementation((url) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/status")) {
+      return Promise.resolve(mockResponse({ authenticated: false }));
+    }
+    if (requestUrl.endsWith("/events")) {
+      return Promise.resolve(mockResponse({ events: [{ id: "1", summary: "Team review", start: { dateTime: `${visibleDate}T09:00:00` }, end: { dateTime: `${visibleDate}T10:00:00` } }] }));
+    }
+    return Promise.resolve(mockResponse({}, { ok: false, status: 500 }));
+  });
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: /Sync calendar/ }));
   fireEvent.click(screen.getByRole("button", { name: "month" }));
@@ -92,9 +143,16 @@ test("syncs API events into the calendar instead of terminal output", async () =
 });
 
 test("shows an AI generation signal while waiting", async () => {
-  global.fetch
-    .mockResolvedValueOnce({ ok: false, json: async () => ({}) })
-    .mockReturnValueOnce(new Promise(() => {}));
+  global.fetch.mockImplementation((url) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/status")) {
+      return Promise.resolve(mockResponse({ authenticated: false }));
+    }
+    if (requestUrl.endsWith("/task-decomposition")) {
+      return new Promise(() => {});
+    }
+    return Promise.resolve(mockResponse({}, { ok: false, status: 500 }));
+  });
   render(<App />);
   const input = screen.getByPlaceholderText("Ask me to plan your tasks…");
   fireEvent.change(input, { target: { value: "Plan my report" } });

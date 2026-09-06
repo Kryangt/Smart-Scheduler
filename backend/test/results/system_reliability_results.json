@@ -1,0 +1,992 @@
+{
+  "summary": {
+    "total_cases": 29,
+    "passed": 18,
+    "failed": 11,
+    "end_to_end_success_rate": 0.6207,
+    "average_latency_seconds": 11.337
+  },
+  "results": [
+    {
+      "id": 1,
+      "input": "Finish my operating systems coding assignment about implement multi-filesystem by next Monday",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 11.93,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Finish an operating systems coding assignment that involves implementing multi-filesystem support by next Monday.",
+        "known_info": {
+          "deliverable": "Completed operating systems coding assignment implementing multi-filesystem support",
+          "estimated_duration_minutes": null,
+          "deadline": "Next Monday",
+          "constraints": [
+            "Operating systems coding assignment",
+            "Topic: implement multi-filesystem support"
+          ]
+        },
+        "missing_info": [
+          "The assignment scope/current progress is too unclear to estimate duration reliably; it could range from a few hours of integration work to a multi-day implementation depending on required features and how much is already done."
+        ],
+        "questions": [
+          "Can you briefly describe the required features and your current progress—for example, is this adding support for multiple filesystem types to existing starter code, and have you started yet?"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "input": "Prepare a 10 minutes presentation of Zeus law in the Odessey tonight, including making slides",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 9.676,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare a 10-minute slide presentation about Zeus' law in the Odyssey tonight.",
+        "known_info": {
+          "deliverable": "A 10-minute presentation on Zeus' law in the Odyssey, including creating slides.",
+          "estimated_duration_minutes": null,
+          "deadline": "tonight",
+          "constraints": [
+            "Must include slides",
+            "Presentation length is 10 minutes",
+            "Topic is Zeus' law in the Odyssey"
+          ]
+        },
+        "missing_info": [
+          "Exact deadline/time tonight is needed for scheduling.",
+          "Starting point/content readiness is needed to estimate duration reliably enough."
+        ],
+        "questions": [
+          "What time tonight does this need to be finished or presented?",
+          "Are you starting from scratch, or do you already have notes/research/content for the presentation?"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "input": "complete the quarterly financial report",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 7.677,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Complete the quarterly financial report.",
+        "known_info": {
+          "deliverable": "Quarterly financial report",
+          "estimated_duration_minutes": null,
+          "deadline": null,
+          "constraints": []
+        },
+        "missing_info": [
+          "Deadline or target completion date is not specified.",
+          "Report scope and data readiness are unclear enough that duration could range from a few hours to multiple days."
+        ],
+        "questions": [
+          "When does the quarterly financial report need to be completed?",
+          "Is this a standard report using an existing template with the financial data already available, or does it require gathering/reconciling data and creating analysis from scratch?"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "input": "Finish my topology homework by next tuesday, chapter 7 exercises",
+      "expected": "success",
+      "actual": "success",
+      "passed": true,
+      "latency_seconds": 22.312,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "success",
+        "sub_tasks": [
+          {
+            "title": "Compile assignment checklist and references",
+            "deadline": "2026-08-22",
+            "estimated_duration_minutes": 30,
+            "reason": "The exact textbook and assigned exercises are not specified, so identifying the full problem set and relevant definitions and theorems is necessary before solving it.",
+            "depends_on": []
+          },
+          {
+            "title": "Draft first half of Chapter 7 solutions",
+            "deadline": "2026-08-23",
+            "estimated_duration_minutes": 150,
+            "reason": "Completing a substantial first batch early leaves time to address difficult proofs and correct mistakes.",
+            "depends_on": [
+              "Compile assignment checklist and references"
+            ]
+          },
+          {
+            "title": "Draft remaining Chapter 7 solutions",
+            "deadline": "2026-08-24 12:00",
+            "estimated_duration_minutes": 150,
+            "reason": "Finishing all initial solutions before the final day preserves time for a rigorous review, with unresolved points identified and resolved.",
+            "depends_on": [
+              "Draft first half of Chapter 7 solutions"
+            ]
+          },
+          {
+            "title": "Review and correct solution set",
+            "deadline": "2026-08-24 20:00",
+            "estimated_duration_minutes": 90,
+            "reason": "Topology proofs require careful verification of definitions, quantifiers, implications, hypotheses, notation, and edge cases.",
+            "depends_on": [
+              "Draft remaining Chapter 7 solutions"
+            ]
+          },
+          {
+            "title": "Prepare submission-ready homework copy",
+            "deadline": "2026-08-25",
+            "estimated_duration_minutes": 60,
+            "reason": "Final formatting and a completeness check ensure that no exercise or required component is omitted before the Tuesday deadline.",
+            "depends_on": [
+              "Review and correct solution set"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "input": "Continue my SmartSchedule project, debug the database part",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.12,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Continue the SmartSchedule project by debugging the database-related functionality.",
+        "known_info": {
+          "deliverable": "Debug the database part of the SmartSchedule project",
+          "estimated_duration_minutes": null,
+          "deadline": null,
+          "constraints": [
+            "Project: SmartSchedule",
+            "Work area: database-related code/functionality"
+          ]
+        },
+        "missing_info": [
+          "Usable deadline or time target",
+          "Specific database issue/symptoms or desired debugging outcome needed to bound the work and estimate duration"
+        ],
+        "questions": [
+          "What deadline or time target should this database debugging be completed by?",
+          "What specific database problem should be debugged—for example connection errors, schema/migration issues, query bugs, data not saving/loading, or failing tests?"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "input": "Prepare a dinner event for 6 people today",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 10.265,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare and host a dinner event for 6 people today.",
+        "known_info": {
+          "deliverable": "Dinner event for 6 people",
+          "estimated_duration_minutes": null,
+          "deadline": "Today, exact time not specified",
+          "constraints": [
+            "6 attendees",
+            "Must be completed today"
+          ]
+        },
+        "missing_info": [
+          "Exact time the dinner needs to be ready or guests arrive",
+          "Menu/event complexity or dietary constraints that could materially affect preparation time and tasks"
+        ],
+        "questions": [
+          "What time should dinner be ready or what time are guests arriving today?",
+          "Should this be a simple home dinner, or a more elaborate/multi-course event? Any dietary restrictions or must-have dishes?"
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "input": "start to prepare and cook a homemade dinner for 6 people, be ready by 7:00 PM today. The budget is about $1000",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 10.012,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare and cook a homemade dinner for 6 people, ready by 7:00 PM today, with a budget of about $1000.",
+        "known_info": {
+          "deliverable": "Homemade dinner for 6 people",
+          "estimated_duration_minutes": null,
+          "deadline": "7:00 PM today",
+          "constraints": [
+            "Budget is about $1000",
+            "Dinner must be ready by the deadline"
+          ]
+        },
+        "missing_info": [
+          "Meal scope/menu complexity and whether grocery shopping is needed; this could change the work from a simple 1–2 hour cooking task to a longer multi-course meal with shopping and prep."
+        ],
+        "questions": [
+          "What kind of dinner are you planning—simple main + sides, or a more elaborate multi-course meal—and do you already have the needed ingredients or should shopping be included?"
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "input": "Pack up my 1b1b apartment for move-out by August 25. I have a normal amount of furniture and belongings.",
+      "expected": "success",
+      "actual": "success",
+      "passed": true,
+      "latency_seconds": 36.676,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "success",
+        "sub_tasks": [
+          {
+            "title": "Create packing inventory and sequence",
+            "deadline": "4 weeks before August 25",
+            "estimated_duration_minutes": 120,
+            "reason": "Establishes the scope, prevents essential or valuable items from being packed incorrectly, and supports accurate supply planning.",
+            "depends_on": []
+          },
+          {
+            "title": "Acquire packing materials and set labeling system",
+            "deadline": "3 weeks before August 25",
+            "estimated_duration_minutes": 120,
+            "reason": "Having sufficient supplies and a consistent room-and-contents labeling system prevents delays and makes move-in easier.",
+            "depends_on": [
+              "Create packing inventory and sequence"
+            ]
+          },
+          {
+            "title": "Remove unwanted belongings",
+            "deadline": "2 weeks before August 25",
+            "estimated_duration_minutes": 240,
+            "reason": "Reducing the volume before packing saves time, supplies, and moving space.",
+            "depends_on": [
+              "Create packing inventory and sequence"
+            ]
+          },
+          {
+            "title": "Pack nonessential items",
+            "deadline": "10 days before August 25",
+            "estimated_duration_minutes": 300,
+            "reason": "Packing low-use belongings first spreads out the workload without disrupting daily living.",
+            "depends_on": [
+              "Acquire packing materials and set labeling system",
+              "Remove unwanted belongings"
+            ]
+          },
+          {
+            "title": "Pack most bedroom and living-room belongings",
+            "deadline": "5 days before August 25",
+            "estimated_duration_minutes": 300,
+            "reason": "These rooms typically contain a substantial share of apartment belongings and should be mostly complete before the final days.",
+            "depends_on": [
+              "Pack nonessential items"
+            ]
+          },
+          {
+            "title": "Pack kitchen and bathroom contents",
+            "deadline": "3 days before August 25",
+            "estimated_duration_minutes": 300,
+            "reason": "These rooms contain fragile, spill-prone, and frequently used items that require careful packing close to move-out.",
+            "depends_on": [
+              "Acquire packing materials and set labeling system",
+              "Remove unwanted belongings"
+            ]
+          },
+          {
+            "title": "Prepare furniture and large electronics",
+            "deadline": "1 day before August 25",
+            "estimated_duration_minutes": 300,
+            "reason": "Proper preparation reduces damage, prevents lost hardware, and ensures large items are ready to move.",
+            "depends_on": [
+              "Pack most bedroom and living-room belongings",
+              "Pack kitchen and bathroom contents"
+            ]
+          },
+          {
+            "title": "Complete final packing and staging",
+            "deadline": "Before move-out on August 25",
+            "estimated_duration_minutes": 180,
+            "reason": "The final sweep ensures nothing is overlooked and confirms the entire apartment is ready to leave by the deadline.",
+            "depends_on": [
+              "Prepare furniture and large electronics"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "input": "Pack up my apartment for move-out by August 25.",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.009,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Pack up the apartment for move-out by August 25.",
+        "known_info": {
+          "deliverable": "Apartment packed for move-out",
+          "estimated_duration_minutes": null,
+          "deadline": "August 25",
+          "constraints": [
+            "Move-out packing; apartment size/amount of belongings not yet known and materially affects duration"
+          ]
+        },
+        "missing_info": [
+          "Apartment size or approximate amount of belongings, needed to estimate packing duration reliably"
+        ],
+        "questions": [
+          "What size is the apartment, and roughly how much needs packing? For example: studio, 1-bedroom, 2-bedroom, or larger; light/average/heavy amount of belongings."
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "input": "Finish my machine learning homework by sunday, implement logistic regression and write the short report",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 9.951,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Complete machine learning homework by Sunday: implement logistic regression and write a short report.",
+        "known_info": {
+          "deliverable": "Machine learning homework consisting of a logistic regression implementation and a short report.",
+          "estimated_duration_minutes": null,
+          "deadline": "Sunday",
+          "constraints": [
+            "Homework is for a machine learning course.",
+            "Deliverable includes both coding and a short written report."
+          ]
+        },
+        "missing_info": [
+          "Implementation starting point/scope is unclear enough that duration could vary substantially, e.g. from modifying starter code to building/debugging the full implementation from scratch."
+        ],
+        "questions": [
+          "Are you starting from scratch, or do you already have starter code/data and some work completed?"
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "input": "Prepare materials for the client meeting tomorrow",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.905,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare materials for a client meeting tomorrow.",
+        "known_info": {
+          "deliverable": "Client meeting materials",
+          "estimated_duration_minutes": null,
+          "deadline": "Tomorrow, exact time unknown",
+          "constraints": []
+        },
+        "missing_info": [
+          "Specific materials or meeting purpose/scope needed to define the deliverable",
+          "Meeting time or latest completion time tomorrow needed for scheduling",
+          "Whether materials already exist or must be created from scratch, because this could substantially change the duration"
+        ],
+        "questions": [
+          "What materials do you need to prepare for the client meeting, and what is the meeting about?",
+          "What time is the meeting tomorrow, or by what time do the materials need to be ready?",
+          "Are you updating existing materials or creating them from scratch?"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "input": "Prepare a 15 minutes client presentation about Q3 sales performance by tomorrow afternoon, including making slides",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 10.17,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare slides for a 15-minute client presentation on Q3 sales performance by tomorrow afternoon.",
+        "known_info": {
+          "deliverable": "A client-ready 15-minute presentation about Q3 sales performance, including creating the slide deck.",
+          "estimated_duration_minutes": null,
+          "deadline": "Tomorrow afternoon",
+          "constraints": [
+            "Presentation length is 15 minutes",
+            "Audience is a client",
+            "Topic is Q3 sales performance",
+            "Slide creation is included"
+          ]
+        },
+        "missing_info": [
+          "Whether the Q3 sales data and key analysis are already available, since this materially changes the workload and duration estimate.",
+          "The exact time tomorrow afternoon when the presentation needs to be ready, since 'afternoon' is not specific enough for scheduling against a near-term deadline."
+        ],
+        "questions": [
+          "What exact time tomorrow afternoon does the presentation need to be ready?",
+          "Do you already have the Q3 sales data/key findings, or does preparing this include gathering and analyzing the sales data?"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "input": "Clean up the apartment this weekend",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 5.442,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Clean up the apartment this weekend.",
+        "known_info": {
+          "deliverable": "Clean up the apartment",
+          "estimated_duration_minutes": null,
+          "deadline": "This weekend",
+          "constraints": []
+        },
+        "missing_info": [
+          "Apartment size/scope and cleaning depth are needed to make a reasonable duration estimate."
+        ],
+        "questions": [
+          "How large is the apartment, and do you mean a light tidy/basic clean or a deeper clean?"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "input": "Deep clean my 1b1b apartment this saturday, including kitchen bathroom bedroom and living room",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 9.91,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Deep clean a 1-bedroom, 1-bathroom apartment this Saturday, covering the kitchen, bathroom, bedroom, and living room.",
+        "known_info": {
+          "deliverable": "Deep clean a 1b1b apartment, including kitchen, bathroom, bedroom, and living room.",
+          "estimated_duration_minutes": null,
+          "deadline": "This Saturday",
+          "constraints": [
+            "Apartment size is 1 bedroom / 1 bathroom",
+            "Areas included: kitchen, bathroom, bedroom, living room"
+          ]
+        },
+        "missing_info": [
+          "Deep-cleaning scope/current condition is too uncertain to estimate duration reliably; time could vary substantially depending on whether this is a standard deep clean or includes heavier tasks like inside appliances, extensive decluttering, baseboards/windows, or heavy grime."
+        ],
+        "questions": [
+          "Is this a standard deep clean of a reasonably tidy apartment, or should it include heavier tasks such as decluttering, inside oven/fridge, windows/baseboards, or heavy grime removal?"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "input": "Finish the patient report by tomorrow",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 8.761,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Finish a patient report by tomorrow.",
+        "known_info": {
+          "deliverable": "Completed patient report",
+          "estimated_duration_minutes": null,
+          "deadline": "Tomorrow (assume by end of day if no specific time is given)",
+          "constraints": []
+        },
+        "missing_info": [
+          "Approximate scope/complexity of the patient report is needed to estimate duration reliably.",
+          "Whether required patient information, notes, labs, or templates are already available materially affects the time needed."
+        ],
+        "questions": [
+          "How long/complex is the patient report—e.g., a brief single-patient summary, a full clinical case report, or something else?",
+          "Do you already have all the needed patient information/notes/results and the required template or format?"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "input": "Finish the regular discharge summary for 8 patients by tomorrow noon, all lab results and doctor notes are already available",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 14.522,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Complete regular discharge summaries for 8 patients by tomorrow at noon, using available lab results and doctor notes.",
+        "known_info": {
+          "deliverable": "Regular discharge summaries for 8 patients",
+          "estimated_duration_minutes": null,
+          "deadline": "Tomorrow at noon",
+          "constraints": [
+            "All lab results are already available",
+            "Doctor notes are already available",
+            "Task involves 8 patients",
+            "Summaries are described as regular/routine"
+          ]
+        },
+        "missing_info": [
+          "Whether the 8 discharge summaries are all straightforward routine cases or whether some involve complex hospital courses/medication reconciliation that would substantially increase the time needed"
+        ],
+        "questions": [
+          "Are all 8 summaries straightforward routine cases using your usual template, or are any of them complex enough to take significantly longer?"
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "input": "Fix the frontend issue in my React project",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.34,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Fix a frontend issue in the user's React project.",
+        "known_info": {
+          "deliverable": "A resolved frontend issue in a React project",
+          "estimated_duration_minutes": null,
+          "deadline": null,
+          "constraints": [
+            "Project uses React",
+            "The specific frontend issue is not yet described"
+          ]
+        },
+        "missing_info": [
+          "Specific issue or expected behavior vs. actual behavior is needed to define the deliverable and estimate effort",
+          "Deadline or desired completion time is needed for scheduling"
+        ],
+        "questions": [
+          "What exactly is the frontend issue—what should happen, what is happening instead, and where in the app does it occur?",
+          "When do you need this fixed by?"
+        ]
+      }
+    },
+    {
+      "id": 18,
+      "input": "Find and Fix the React login page bug where the submit button does nothing after entering email and password, finish it tonight",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 14.13,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Debug and fix a React login page issue where clicking submit after entering email and password appears to do nothing, and complete it tonight.",
+        "known_info": {
+          "deliverable": "A working React login page submit flow where the submit button triggers the expected login action after email and password are entered.",
+          "estimated_duration_minutes": null,
+          "deadline": "tonight",
+          "constraints": [
+            "React login page bug",
+            "Symptom: submit button does nothing after entering email and password",
+            "Must be completed tonight"
+          ]
+        },
+        "missing_info": [
+          "Whether the bug is limited to the frontend form/submit handler or may involve backend/auth API/routing, since that could change the task from a short UI fix to a larger integration/debugging task.",
+          "Whether the project is already accessible and runnable locally, since setup/access problems could materially change the duration."
+        ],
+        "questions": [
+          "Is the app/repo already accessible and running locally, and do you expect this to be a frontend-only React form issue or could backend/auth API routing also be involved?"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "input": "Study for my chemistry exam next week",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 7.184,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Study for an upcoming chemistry exam next week.",
+        "known_info": {
+          "deliverable": "Prepare for a chemistry exam.",
+          "estimated_duration_minutes": null,
+          "deadline": "Next week, exact exam date/time unspecified.",
+          "constraints": []
+        },
+        "missing_info": [
+          "Exact exam date/time is needed to create a usable schedule.",
+          "Exam scope or course level is needed because study time could vary from a few hours to multiple days."
+        ],
+        "questions": [
+          "What day and time next week is the chemistry exam?",
+          "What course/level and topics or chapters does the exam cover?"
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "input": "continue review chapter 5 to chapter 8 for my chemistry exam next friday, focus on equilibrium acids bases and thermodynamics",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 11.049,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Continue reviewing chemistry chapters 5–8 for an exam next Friday, focusing on equilibrium, acids and bases, and thermodynamics.",
+        "known_info": {
+          "deliverable": "Review chemistry chapters 5–8 with emphasis on equilibrium, acids/bases, and thermodynamics for the exam.",
+          "estimated_duration_minutes": null,
+          "deadline": "Next Friday, 2026-08-28",
+          "constraints": [
+            "Focus topics: equilibrium, acids and bases, thermodynamics",
+            "This is exam preparation, not a homework deliverable",
+            "Task says “continue,” so some review may already be completed, but the amount is unknown"
+          ]
+        },
+        "missing_info": [
+          "Current progress or preparedness level, because the remaining study time could vary from a short refresh to a multi-session review across four chapters."
+        ],
+        "questions": [
+          "How much of chapters 5–8 have you already reviewed, and do you need a quick refresher, moderate review with practice problems, or a thorough relearning-style review?"
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "input": "Prepare the monthly marketing report",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 7.101,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare a monthly marketing report.",
+        "known_info": {
+          "deliverable": "Monthly marketing report",
+          "estimated_duration_minutes": null,
+          "deadline": null,
+          "constraints": []
+        },
+        "missing_info": [
+          "Deadline or usable target completion time is not specified.",
+          "Report scope and data readiness are unclear enough to materially affect the duration estimate."
+        ],
+        "questions": [
+          "When does the monthly marketing report need to be completed?",
+          "What should the report include, and is the needed data already available? For example: channels/KPIs to cover, slide deck vs document/spreadsheet, and whether you need analysis/recommendations or just reporting."
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "input": "Prepare the monthly marketing report for our social media campaigns by monday, summarize Instagram TikTok and Google Ads performance",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 11.343,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare a monthly marketing report summarizing Instagram, TikTok, and Google Ads campaign performance by Monday.",
+        "known_info": {
+          "deliverable": "Monthly marketing report summarizing Instagram, TikTok, and Google Ads performance",
+          "estimated_duration_minutes": null,
+          "deadline": "Monday, likely 2026-08-24 based on current date",
+          "constraints": [
+            "Covers social media campaigns for Instagram and TikTok plus Google Ads",
+            "Report is monthly",
+            "Due by Monday"
+          ]
+        },
+        "missing_info": [
+          "Whether the report can be built from existing accessible data/templates or requires pulling/exporting data and creating the report structure, which materially affects the duration estimate."
+        ],
+        "questions": [
+          "Do you already have the data/access and an existing report template or dashboard, or should this include pulling/exporting the platform data and creating the report from scratch?"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "input": "Get everything ready for my trip tomorrow",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.119,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare for the user's trip tomorrow, likely including packing and essential pre-departure tasks.",
+        "known_info": {
+          "deliverable": "Get ready for a trip, including likely packing and travel preparation.",
+          "estimated_duration_minutes": null,
+          "deadline": "Tomorrow, before departure.",
+          "constraints": []
+        },
+        "missing_info": [
+          "Exact usable deadline: the departure time tomorrow is needed to schedule preparation.",
+          "Trip scope/requirements: trip length and whether it is domestic or international materially affect what needs to be prepared and the duration estimate."
+        ],
+        "questions": [
+          "What time do you need to leave or depart tomorrow?",
+          "How long is the trip, and is it domestic or international?"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "input": "Pack for my 4 days business trip to Seattle tomorrow morning, including clothes laptop chargers and work documents",
+      "expected": "success",
+      "actual": "success",
+      "passed": true,
+      "latency_seconds": 24.246,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "success",
+        "sub_tasks": [
+          {
+            "title": "Finalize packing checklist",
+            "deadline": "This evening",
+            "estimated_duration_minutes": 10,
+            "reason": "Confirming itinerary, business needs, and Seattle weather first helps prevent missing appropriate clothing, rain protection, layers, or destination-specific items.",
+            "depends_on": []
+          },
+          {
+            "title": "Pack clothing and personal items",
+            "deadline": "Tonight before bed",
+            "estimated_duration_minutes": 30,
+            "reason": "Clothing and personal items are the largest packing category and must cover four days of business activities, travel, and Seattle conditions.",
+            "depends_on": [
+              "Finalize packing checklist"
+            ]
+          },
+          {
+            "title": "Organize work documents",
+            "deadline": "Tonight before bed",
+            "estimated_duration_minutes": 20,
+            "reason": "Reviewing, organizing, and backing up work documents ensures meeting materials, identification, and itinerary details are complete and accessible.",
+            "depends_on": [
+              "Finalize packing checklist"
+            ]
+          },
+          {
+            "title": "Gather and charge electronics",
+            "deadline": "Tonight before bed",
+            "estimated_duration_minutes": 15,
+            "reason": "Staging chargers, adapters, cables, headphones, power accessories, and charging devices reduces the risk of forgetting essential work equipment before departure.",
+            "depends_on": [
+              "Finalize packing checklist"
+            ]
+          },
+          {
+            "title": "Stage packed bags by exit",
+            "deadline": "Tonight before bed",
+            "estimated_duration_minutes": 15,
+            "reason": "Staging luggage and the work bag in advance minimizes morning tasks and identifies any overnight items that still need last-minute packing.",
+            "depends_on": [
+              "Pack clothing and personal items",
+              "Organize work documents",
+              "Gather and charge electronics"
+            ]
+          },
+          {
+            "title": "Complete final departure check",
+            "deadline": "Tomorrow morning before departure",
+            "estimated_duration_minutes": 10,
+            "reason": "A final check confirms essentials such as laptop, chargers, work documents, identification, wallet, phone, medications, and overnight items are in the appropriate bags.",
+            "depends_on": [
+              "Stage packed bags by exit"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "input": "Review the legal contract before friday",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.063,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Review a legal contract before Friday.",
+        "known_info": {
+          "deliverable": "Review a legal contract",
+          "estimated_duration_minutes": null,
+          "deadline": "before Friday, likely the upcoming Friday",
+          "constraints": []
+        },
+        "missing_info": [
+          "Contract size/complexity or review depth is needed to estimate duration reliably."
+        ],
+        "questions": [
+          "About how long is the contract, and what level of review do you need—for example, a quick read-through for obvious issues, detailed comments/redlines, or legal-risk analysis?"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "input": "Review a 12 page software vendor contract before friday, focus on payment terms termination and data privacy clauses",
+      "expected": "success",
+      "actual": "success",
+      "passed": true,
+      "latency_seconds": 26.914,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "success",
+        "sub_tasks": [
+          {
+            "title": "Create clause map",
+            "deadline": "Within the first 30 minutes of the review session, and no later than Thursday before the upcoming Friday",
+            "estimated_duration_minutes": 30,
+            "reason": "Creates a complete review scope and prevents relevant provisions from being missed or assessed without their related definitions and dependencies.",
+            "depends_on": []
+          },
+          {
+            "title": "Review payment terms",
+            "deadline": "Within 65 minutes of starting the review, and no later than Thursday before the upcoming Friday",
+            "estimated_duration_minutes": 35,
+            "reason": "Identifies financial exposure, ambiguous billing obligations, and terms that may need clarification or negotiation.",
+            "depends_on": [
+              "Create clause map"
+            ]
+          },
+          {
+            "title": "Review termination terms",
+            "deadline": "Within 100 minutes of starting the review, and no later than Thursday before the upcoming Friday",
+            "estimated_duration_minutes": 35,
+            "reason": "Determines how the relationship can end, the costs and operational risks involved, and which obligations continue afterward.",
+            "depends_on": [
+              "Create clause map"
+            ]
+          },
+          {
+            "title": "Review data privacy terms",
+            "deadline": "Within 150 minutes of starting the review, and no later than Thursday before the upcoming Friday",
+            "estimated_duration_minutes": 50,
+            "reason": "Surfaces privacy and security risks while avoiding assumptions about governing law or compliance requirements that have not been provided.",
+            "depends_on": [
+              "Create clause map"
+            ]
+          },
+          {
+            "title": "Prepare final reviewed contract package",
+            "deadline": "By end of day Thursday, before the upcoming Friday",
+            "estimated_duration_minutes": 40,
+            "reason": "Turns the detailed review into a clear, actionable deliverable and checks that recommendations are consistent across payment, termination, and privacy provisions.",
+            "depends_on": [
+              "Review payment terms",
+              "Review termination terms",
+              "Review data privacy terms"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "input": "Analyze the experiment results for my research project",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 5.922,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Analyze experiment results for a research project.",
+        "known_info": {
+          "deliverable": "An analysis of experiment results for a research project",
+          "estimated_duration_minutes": null,
+          "deadline": null,
+          "constraints": []
+        },
+        "missing_info": [
+          "The specific analysis deliverable/scope is unclear enough that the work could range from a quick summary to a multi-day statistical analysis and report.",
+          "No deadline or usable target completion time was provided."
+        ],
+        "questions": [
+          "What should the analysis produce—e.g., a brief summary of findings, statistical tests/plots, a written results section, or a full report/presentation?",
+          "When do you need this completed?"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "input": "Analyze the results from my robotics experiment by sunday, compare the success rate of 3 control methods across 200 trials",
+      "expected": "success",
+      "actual": "clarification",
+      "passed": false,
+      "latency_seconds": 9.888,
+      "reason": "expected success, but system returned clarification",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Analyze robotics experiment results by Sunday by comparing the success rates of 3 control methods across 200 trials.",
+        "known_info": {
+          "deliverable": "Comparison of success rates for 3 robotics control methods across 200 trials",
+          "estimated_duration_minutes": null,
+          "deadline": "Sunday, likely the upcoming Sunday",
+          "constraints": [
+            "Robotics experiment",
+            "3 control methods",
+            "200 trials",
+            "Analysis focused on success rate comparison"
+          ]
+        },
+        "missing_info": [
+          "Whether the data is already collected and organized in an analyzable format",
+          "Expected output format/scope, since a quick comparison versus a written report with plots/statistical tests would materially change the duration"
+        ],
+        "questions": [
+          "Is the 200-trial data already collected and organized in a file/table ready to analyze?",
+          "What do you need as the final output: a quick summary, plots/statistical comparison, or a written report/slides?"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "input": "Prepare food for the party tonight",
+      "expected": "clarification",
+      "actual": "clarification",
+      "passed": true,
+      "latency_seconds": 6.139,
+      "reason": "matched expected behavior",
+      "response": {
+        "status": "needs_clarification",
+        "clarified_task": "Prepare food for a party tonight.",
+        "known_info": {
+          "deliverable": "Food prepared for a party",
+          "estimated_duration_minutes": null,
+          "deadline": "tonight, exact ready time not specified",
+          "constraints": []
+        },
+        "missing_info": [
+          "Exact time the food needs to be ready",
+          "Party size and food scope, because preparation time could range from a quick snack platter to many hours of cooking"
+        ],
+        "questions": [
+          "What time tonight does the food need to be ready?",
+          "About how many people are you feeding, and are you planning simple snacks/appetizers or a full meal?"
+        ]
+      }
+    }
+  ]
+}
