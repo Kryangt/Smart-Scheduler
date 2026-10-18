@@ -14,6 +14,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from dotenv import load_dotenv
 from backend.app.services.google_tasks_service import create_task, get_tasks_list
+from backend.app.services.classifier_service import classify_task, classify_titles
 from backend.app.services.google_events_service import create_events_batch, get_events
 from backend.app.services.scheduler_service import schedule
 from backend.app.services.ai_assistance_service import ai_assistance_control_center, handle_task_confirmation
@@ -235,8 +236,10 @@ def create_events_for_schedule(
     if not scheduled_items:
         return []
 
+    predictions = classify_titles([item.get("title", "AI Scheduled Task") for item in scheduled_items])
     event_specs = []
-    for item in scheduled_items:
+    for item, prediction in zip(scheduled_items, predictions):
+        item["classification"] = prediction
         start_dt = datetime.fromisoformat(item["start"])
         end_dt = datetime.fromisoformat(item["end"])
         event_specs.append({
@@ -247,13 +250,16 @@ def create_events_for_schedule(
             "estimated_duration": item.get("estimated_duration", 0),
         })
 
-    return create_events_batch(
+    created = create_events_batch(
         creds,
         user,
         db,
         calendar or "primary",
         event_specs,
     )
+    for item, event in zip(scheduled_items, created):
+        item["google_event_id"] = event.get("id")
+    return created
 
 @app.get("/")
 def root():
@@ -377,7 +383,7 @@ def callback(request: Request, db: Session = Depends(get_db)):
         value=session_id,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite="none" if COOKIE_SECURE else "lax",
         max_age=60 * 60 * 24 * 7,
     )
 
@@ -468,7 +474,8 @@ def create_task_api(request: Request, payload: CreateTaskRequest, user: User = D
         payload.date,
         payload.due,
     )
-    return {"task": created_task}
+    classification = classify_task(payload.title)
+    return {"task": created_task, "classification": classification}
 
 @app.post("/scheduledtasks")
 def schedule_tasks_api(request: Request, payload: ScheduleRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):

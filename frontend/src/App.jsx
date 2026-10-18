@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ChatPanel from "./ChatPanel.jsx";
 
@@ -33,8 +33,22 @@ function normalizeEvents(data) {
     start: event.start?.dateTime ?? event.start?.date ?? event.start,
     end: event.end?.dateTime ?? event.end?.date ?? event.end,
     priority: event.priority ?? "medium",
-    source: "event"
+    source: event.source ?? "event",
+    classification: event.classification,
+    google_event_id: event.google_event_id
   })).filter((event) => event.start);
+}
+
+function durationHours(task) {
+  const value = Number(task.estimated_duration ?? (task.estimated_duration_minutes == null ? 1 : task.estimated_duration_minutes / 60));
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+function schedulingError(data) {
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((error) => `${(error.loc ?? []).filter((part) => part !== "body").join(".")}: ${error.msg}`).join("; ");
+  }
+  return typeof data.detail === "string" ? data.detail : typeof data.error === "string" ? data.error : "Scheduling failed";
 }
 
 function normalizeTasks(data) {
@@ -43,13 +57,50 @@ function normalizeTasks(data) {
     id: task.id ?? `task-${index}-${Date.now()}`,
     title: task.title ?? "Untitled task",
     deadline: task.deadline ?? task.due?.slice(0, 10) ?? "",
-    estimated_duration: task.estimated_duration ?? task.estimated_duration_minutes / 60 ?? 1,
+    estimated_duration: durationHours(task),
     priority: task.priority ?? "medium",
     reason: task.reason ?? ""
   }));
 }
 
-function Calendar({ items, view, setView, cursor, setCursor }) {
+function ClassificationBadges({ classification }) {
+  if (!classification || !["classified", "uncertain"].includes(classification.status)) return null;
+  const uncertain = classification.status === "uncertain";
+  return <span className="classification-badges" aria-label="Task classification">
+    {[["Domain", classification.domain], ["Effort", classification.effort]].map(([kind, label]) =>
+      typeof label === "string" && label && <span key={kind} className={`classification-badge ${kind.toLowerCase()}`} title={`${kind}: ${label}${uncertain ? " (uncertain prediction)" : ""}`}>
+        {label.replaceAll("_", " ")}{uncertain ? " ?" : ""}
+      </span>
+    )}
+  </span>;
+}
+
+function ScheduledDetails({ task, onClose }) {
+  const dialog = useRef(null);
+  useEffect(() => {
+    dialog.current.showModal();
+  }, []);
+  const formatDate = (value) => value ? new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Not available";
+  const minutes = (new Date(task.end) - new Date(task.start)) / 60000;
+  return <dialog ref={dialog} className="scheduled-dialog" aria-labelledby="scheduled-detail-title" onCancel={onClose} onClick={(event) => { if (event.target === dialog.current) onClose(); }}>
+    <div className="scheduled-detail-content">
+      <div className="modal-heading"><div><span className="eyebrow">SCHEDULED TASK</span><h2 id="scheduled-detail-title">{task.title}</h2></div><button className="icon-button" aria-label="Close task details" onClick={onClose} autoFocus>×</button></div>
+      <ClassificationBadges classification={task.classification}/>
+      <dl className="task-detail-list">
+        <div><dt>Starts</dt><dd>{formatDate(task.start)}</dd></div>
+        <div><dt>Ends</dt><dd>{formatDate(task.end)}</dd></div>
+        {Number.isFinite(minutes) && minutes > 0 && <div><dt>Scheduled duration</dt><dd>{minutes} minutes</dd></div>}
+        <div><dt>Priority</dt><dd>{taskPriority(task)}</dd></div>
+        {task.deadline && <div><dt>Deadline</dt><dd>{task.deadline.slice(0, 10)}</dd></div>}
+        {task.reason && <div><dt>Notes</dt><dd>{task.reason}</dd></div>}
+        {!task.classification?.domain && <div><dt>Classification</dt><dd>Not available</dd></div>}
+      </dl>
+      <button className="primary-button" onClick={onClose}>Done</button>
+    </div>
+  </dialog>;
+}
+
+function Calendar({ items, view, setView, cursor, setCursor, onSelectTask }) {
   const days = useMemo(() => {
     if (view === "day") return [new Date(cursor)];
     if (view === "week") return Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cursor), i));
@@ -92,13 +143,13 @@ function Calendar({ items, view, setView, cursor, setCursor }) {
         <div className="month-view">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <div className="weekday" key={day}>{day}</div>)}
           {days.map((day) => (
-            <button className={`month-day ${day.getMonth() !== cursor.getMonth() ? "outside" : ""} ${dateKey(day) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(day)} onClick={() => { setCursor(day); setView("day"); }}>
-              <span className="day-number">{day.getDate()}</span>
+            <div className={`month-day ${day.getMonth() !== cursor.getMonth() ? "outside" : ""} ${dateKey(day) === dateKey(new Date()) ? "today" : ""}`} key={dateKey(day)}>
+              <button className="day-number" onClick={() => { setCursor(day); setView("day"); }}>{day.getDate()}</button>
               <span className="month-items">
-                {itemsForDay(day).slice(0, 3).map((item) => <span className={`calendar-event priority-${taskPriority(item)}`} key={item.id}>{item.title}</span>)}
+                {itemsForDay(day).slice(0, 3).map((item) => <button className={`calendar-event priority-${taskPriority(item)}`} key={item.id} onClick={() => onSelectTask(item)}>{item.title}<ClassificationBadges classification={item.classification}/></button>)}
                 {itemsForDay(day).length > 3 && <span className="more-items">+{itemsForDay(day).length - 3} more</span>}
               </span>
-            </button>
+            </div>
           ))}
         </div>
       ) : (
@@ -110,7 +161,7 @@ function Calendar({ items, view, setView, cursor, setCursor }) {
               <span className="hour-label">{hour > 12 ? hour - 12 : hour}:00 {hour >= 12 ? "PM" : "AM"}</span>
               {days.map((day) => {
                 const slotItems = itemsForDay(day).filter((item) => parseDate(item.start)?.getHours() === hour);
-                return <div className="time-cell" key={`${dateKey(day)}-${hour}`}>{slotItems.map((item) => <div className={`calendar-event priority-${taskPriority(item)}`} key={item.id}><strong>{item.title}</strong><span>{parseDate(item.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>)}</div>;
+                return <div className="time-cell" key={`${dateKey(day)}-${hour}`}>{slotItems.map((item) => <button className={`calendar-event priority-${taskPriority(item)}`} key={item.id} onClick={() => onSelectTask(item)}><strong>{item.title}</strong><ClassificationBadges classification={item.classification}/><span>{parseDate(item.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></button>)}</div>;
               })}
             </div>
           ))}
@@ -126,6 +177,7 @@ function App() {
   const [scheduledTasks, setScheduledTasks] = useState([]);
   const [events, setEvents] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [scheduledDetail, setScheduledDetail] = useState(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [notice, setNotice] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
@@ -165,18 +217,6 @@ function App() {
           return;
         }
         if (active) setIsAuthenticated(true);
-        const initialResponse = await fetch(`${API_BASE}/initial`, {
-          credentials: "include",
-        });
-  
-        if (!initialResponse.ok) {
-          throw new Error("Failed to initialize application");
-        }
-        const initialData = await initialResponse.json();
-        const initialEvents = normalizeEvents(initialData);
-        if (active) {
-          setEvents(initialEvents);
-        }
       } catch (error) {
         console.error("Application initialization failed:", error);
         if (active) {
@@ -195,7 +235,14 @@ function App() {
       const response = await fetch(`${API_BASE}/events`, { credentials: "include" });
       if (!response.ok) throw new Error("Could not load events");
       const data = await response.json();
-      setEvents(normalizeEvents(data));
+      const freshEvents = normalizeEvents(data);
+      setEvents(freshEvents);
+      // Display Google state; keep predictions only for matching session events.
+      const byId = new Map(freshEvents.map((event) => [event.id, event]));
+      setScheduledTasks((current) => current.flatMap((task) => {
+        const event = byId.get(task.google_event_id);
+        return event ? [{ ...task, title: event.title, start: event.start, end: event.end }] : [];
+      }));
       setNotice("Calendar updated");
     } catch (error) { setNotice(error.message); }
   };
@@ -221,12 +268,14 @@ function App() {
     setSelectedTask(null);
   };
   const handleDraft = (drafts) => setPendingTasks((current) => {
-    const draftTasks = drafts.map((task, index) => ({ ...task, id: task.id ?? `ai-${Date.now()}-${index}`, priority: task.priority ?? "medium", estimated_duration: task.estimated_duration ?? (task.estimated_duration_minutes || 60) / 60, aiDraft: true }));
+    const draftTasks = drafts.map((task, index) => ({ ...task, id: task.id ?? `ai-${Date.now()}-${index}`, priority: task.priority ?? "medium", estimated_duration: durationHours(task), aiDraft: true }));
     const nonDrafts = current.filter((task) => !task.aiDraft);
     return [...nonDrafts, ...draftTasks];
   });
   const scheduleWaitingTasks = async () => {
     if (!pendingTasks.length || isScheduling) return;
+    const invalidTask = pendingTasks.find((task) => !task.deadline || !Number.isFinite(Number(task.estimated_duration)) || Number(task.estimated_duration) <= 0);
+    if (invalidTask) return setNotice(`Set a deadline and a positive duration for "${invalidTask.title}" before scheduling.`);
     setIsScheduling(true);
     try {
       const response = await fetch(`${API_BASE}/scheduledtasks`, {
@@ -245,7 +294,7 @@ function App() {
         })
       });
       const data = await response.json();
-      if (!response.ok || data.error) throw new Error(data.detail ?? data.error ?? "Scheduling failed");
+      if (!response.ok || data.error) throw new Error(schedulingError(data));
 
       const scheduled = data?.schedule?.scheduled ?? [];
       const unscheduled = data?.schedule?.unscheduled ?? [];
@@ -282,7 +331,8 @@ function App() {
     setNotice(scheduled.length ? `${scheduled.length} task${scheduled.length === 1 ? "" : "s"} scheduled` : "Tasks confirmed");
     getEvents();
   };
-  const calendarItems = [...events, ...scheduledTasks];
+  const scheduledGoogleIds = new Set(scheduledTasks.map((task) => task.google_event_id).filter(Boolean));
+  const calendarItems = [...events.filter((event) => !scheduledGoogleIds.has(event.id)), ...scheduledTasks];
 
   return (
     <div className="app-shell">
@@ -296,18 +346,19 @@ function App() {
           <div className="section-title"><div><span className="eyebrow">INBOX</span><h2>Waiting to schedule</h2></div><button className="add-button" onClick={() => setShowTaskForm((open) => !open)}>+</button></div>
           {showTaskForm && <div className="compact-form"><input aria-label="Task title" placeholder="What needs doing?" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}/><div><input aria-label="Deadline" type="date" value={taskForm.deadline} onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })}/><input aria-label="Duration hours" type="number" min="0.5" step="0.5" placeholder="Hours" value={taskForm.duration} onChange={(e) => setTaskForm({ ...taskForm, duration: e.target.value })}/></div><select aria-label="Priority" value={taskForm.priority} onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select><button className="primary-button" onClick={addTask}>Add to queue</button></div>}
           <div className="task-list">
-            {sortByPriority(pendingTasks).map((task) => <button className={`task-card priority-${taskPriority(task)}`} key={task.id} onClick={() => setSelectedTask({ ...task })}><span className="priority-dot"/><span className="task-copy"><strong>{task.title}</strong><span>{task.deadline ? `Due ${new Date(`${task.deadline}T12:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "No deadline"} · {task.estimated_duration ?? 1}h</span></span>{task.aiDraft && <span className="ai-tag">AI</span>}</button>)}
+            {sortByPriority(pendingTasks).map((task) => <div className={`queue-row priority-${taskPriority(task)}`} key={task.id}><button className="task-card" onClick={() => setSelectedTask({ ...task })}><span className="priority-dot"/><span className="task-copy"><strong>{task.title}</strong><span>{task.deadline ? `Due ${new Date(`${task.deadline}T12:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "No deadline"} · {task.estimated_duration ?? 1}h</span></span>{task.aiDraft && <span className="ai-tag">AI</span>}</button><button className="queue-remove" disabled={isScheduling} aria-label={`Remove ${task.title} from queue`} title="Remove from queue" onClick={() => { setPendingTasks((current) => current.filter((item) => item.id !== task.id)); setNotice("Task removed from queue"); }}>×</button></div>)}
             {!pendingTasks.length && <div className="empty-state"><span>✓</span><strong>Your queue is clear</strong><p>Add a task or ask the assistant to make a plan.</p></div>}
           </div>
           {pendingTasks.length > 0 && <div className="schedule-action"><button className="primary-button schedule-button" onClick={scheduleWaitingTasks} disabled={isScheduling}>{isScheduling ? <><span className="button-spinner"/> Scheduling…</> : <>✦ Schedule</>}</button><span>Find the best available times for {pendingTasks.length} task{pendingTasks.length === 1 ? "" : "s"}</span></div>}
-          <div className="scheduled-summary"><div className="section-title"><div><span className="eyebrow">PLAN</span><h2>Scheduled tasks</h2></div><span className="count-badge">{scheduledTasks.length}</span></div>{sortByPriority(scheduledTasks).slice(0, 5).map((task) => <div className={`scheduled-row priority-${taskPriority(task)}`} key={task.id}><span className="priority-dot"/><div><strong>{task.title}</strong><span>{parseDate(task.start)?.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span></div></div>)}{!scheduledTasks.length && <p className="muted">Confirmed tasks will appear here.</p>}</div>
+          <div className="scheduled-summary"><div className="section-title"><div><span className="eyebrow">PLAN</span><h2>Scheduled tasks</h2></div><span className="count-badge">{scheduledTasks.length}</span></div>{sortByPriority(scheduledTasks).slice(0, 5).map((task) => <button className={`scheduled-row priority-${taskPriority(task)}`} key={task.id} onClick={() => setScheduledDetail(task)}><span className="priority-dot"/><div><strong>{task.title}</strong><ClassificationBadges classification={task.classification}/><span>{parseDate(task.start)?.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span></div></button>)}{!scheduledTasks.length && <p className="muted">Confirmed tasks will appear here.</p>}</div>
         </aside>
 
-        <Calendar items={calendarItems} view={view} setView={setView} cursor={cursor} setCursor={setCursor}/>
+        <Calendar onSelectTask={setScheduledDetail} items={calendarItems} view={view} setView={setView} cursor={cursor} setCursor={setCursor}/>
         <ChatPanel onDraftTasks={handleDraft} onTasksConfirmed={handleConfirmed}/>
       </main>
 
       {notice && <button className="toast" onClick={() => setNotice("")}>{notice}<span>×</span></button>}
+      {scheduledDetail && <ScheduledDetails task={scheduledDetail} onClose={() => setScheduledDetail(null)}/>}
       {selectedTask && <div className="modal-backdrop" onMouseDown={() => setSelectedTask(null)}><form className="edit-modal" onSubmit={updateTask} onMouseDown={(e) => e.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">EDIT TASK</span><h2>Task details</h2></div><button type="button" className="icon-button" onClick={() => setSelectedTask(null)}>×</button></div><label>Title<input value={selectedTask.title} onChange={(e) => setSelectedTask({ ...selectedTask, title: e.target.value })}/></label><div className="form-row"><label>Deadline<input type="date" value={selectedTask.deadline?.slice(0, 10) ?? ""} onChange={(e) => setSelectedTask({ ...selectedTask, deadline: e.target.value })}/></label><label>Duration (hours)<input type="number" min="0.5" step="0.5" value={selectedTask.estimated_duration} onChange={(e) => setSelectedTask({ ...selectedTask, estimated_duration: Number(e.target.value) })}/></label></div><label>Priority<select value={taskPriority(selectedTask)} onChange={(e) => setSelectedTask({ ...selectedTask, priority: e.target.value })}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setSelectedTask(null)}>Cancel</button><button className="primary-button">Save changes</button></div></form></div>}
     </div>
   );

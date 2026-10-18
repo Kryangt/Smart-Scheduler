@@ -97,10 +97,11 @@ def _persist_event_record(db, user, date, start, end, summary, estimated_duratio
         deadline=end_datetime,
     )
     db.add(task_record)
-    db.flush()
     scheduled_block = Scheduled_Blocks(
         user_id=user.id,
-        task_id=task_record.id,
+        # Let SQLAlchemy assign the foreign key at flush/commit so a schedule
+        # can batch its inserts instead of flushing once for every task.
+        task=task_record,
         start_time=start_datetime,
         end_time=end_datetime,
         status="scheduled",

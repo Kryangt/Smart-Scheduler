@@ -5,12 +5,6 @@ from backend.app.services.scheduler_service import schedule
 import json
 
 
-VPN_PORT = "7897"
-os.environ["http_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["https_proxy"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["HTTP_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
-os.environ["HTTPS_PROXY"] = f"http://127.0.0.1:{VPN_PORT}"
-
 _client = None
 def getAIClient():
     global _client

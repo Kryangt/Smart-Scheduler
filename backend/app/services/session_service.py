@@ -17,7 +17,9 @@ def save_session(session_id: str, user_id: int, credentials: dict[str, Any]) -> 
             ex = SESSION_TTL_SECONDS
         )
     except RedisError as exc:
-        raise RuntimeError("Failed to save session") from exc
+        print("REDIS ERROR:", repr(exc))
+        raise
+
     
 def get_session(session_id: str) -> Optional[dict[str, Any]]:
     try:

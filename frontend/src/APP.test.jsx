@@ -53,10 +53,6 @@ test("initializes the app and shows the Google avatar after authentication", asy
   expect(screen.queryByRole("button", { name: "Login" })).not.toBeInTheDocument();
   await waitFor(() => {
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringMatching(/\/initial$/),
-      { credentials: "include" }
-    );
-    expect(global.fetch).toHaveBeenCalledWith(
       expect.stringMatching(/\/events$/),
       { credentials: "include" }
     );
@@ -86,7 +82,7 @@ test("schedules all waiting tasks with the scheduling API", async () => {
     if (requestUrl.endsWith("/scheduledtasks")) {
       return Promise.resolve(mockResponse({
         schedule: {
-          scheduled: [{ title: "Finish proposal", start: "2026-07-25T09:00:00", end: "2026-07-25T11:00:00" }],
+          scheduled: [{ classification: {status: "classified", domain: "work", effort: "mental"}, title: "Finish proposal", start: "2026-07-25T09:00:00", end: "2026-07-25T11:00:00" }],
           unscheduled: []
         }
       }));
@@ -120,6 +116,8 @@ test("schedules all waiting tasks with the scheduling API", async () => {
   });
   expect(await screen.findByText("1 task scheduled")).toBeInTheDocument();
   expect(screen.getByText("Sat 9:00 AM")).toBeInTheDocument();
+  expect(screen.getByTitle("Domain: work")).toBeInTheDocument();
+  expect(screen.getByTitle("Effort: mental")).toBeInTheDocument();
 });
 
 test("syncs API events into the calendar instead of terminal output", async () => {
@@ -159,4 +157,132 @@ test("shows an AI generation signal while waiting", async () => {
   fireEvent.submit(input.closest("form"));
   await waitFor(() => expect(screen.getByLabelText("AI is generating a response")).toBeInTheDocument());
   expect(within(screen.getByLabelText("AI is generating a response")).getByText("Building your plan")).toBeInTheDocument();
+});
+
+
+
+test("does not load stale database tasks after refresh", async () => {
+  global.fetch.mockImplementation((url) => {
+    if (String(url).endsWith("/auth/status")) return Promise.resolve(mockResponse({authenticated: true}));
+    if (String(url).endsWith("/initial")) return Promise.resolve(mockResponse({events: [{
+      id: "database-task-1", summary: "Existing task", start: {dateTime: "2030-01-07T09:00:00"},
+      end: {dateTime: "2030-01-07T10:00:00"}, source: "database"
+    }]}));
+    return Promise.resolve(mockResponse({events: []}));
+  });
+  render(<App />);
+  await screen.findByRole("button", {name: "Google account"});
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/events$/), {credentials: "include"}));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/initial"))).toBe(false);
+  expect(screen.queryByText("Existing task")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Task classification")).not.toBeInTheDocument();
+});
+
+
+test("sync removes deleted tasks, preserves predictions, and retains state on failure", async () => {
+  let deleted = false;
+  let failed = false;
+  global.fetch.mockImplementation((url) => {
+    if (String(url).endsWith("/auth/status")) return Promise.resolve(mockResponse({authenticated: false}));
+    if (String(url).endsWith("/scheduledtasks")) return Promise.resolve(mockResponse({schedule: {
+      scheduled: [{title: "New task", start: "2030-01-07T09:00:00", end: "2030-01-07T10:00:00", google_event_id: "event-1",
+        classification: {status: "classified", domain: "work", effort: "mental"}}], unscheduled: []
+    }}));
+    if (String(url).endsWith("/events")) return Promise.resolve(failed
+      ? mockResponse({}, {ok: false, status: 503})
+      : mockResponse({events: deleted ? [] : [{id: "event-1", summary: "Renamed in Google", start: {dateTime: "2030-01-07T09:00:00"}, end: {dateTime: "2030-01-07T10:00:00"}}]}));
+    return Promise.resolve(mockResponse({}));
+  });
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", {name: "+"}));
+  fireEvent.change(screen.getByLabelText("Task title"), {target: {value: "New task"}});
+  fireEvent.change(screen.getByLabelText("Deadline"), {target: {value: "2030-01-07"}});
+  fireEvent.change(screen.getByLabelText("Duration hours"), {target: {value: "1"}});
+  fireEvent.click(screen.getByText("Add to queue"));
+  fireEvent.click(screen.getByRole("button", {name: /Schedule/}));
+  await screen.findByText("1 task scheduled");
+  fireEvent.click(screen.getByRole("button", {name: /Sync calendar/}));
+  await screen.findByText("Renamed in Google");
+  expect(screen.queryByText("New task")).not.toBeInTheDocument();
+  expect(screen.getByTitle("Domain: work")).toBeInTheDocument();
+  failed = true;
+  fireEvent.click(screen.getByRole("button", {name: /Sync calendar/}));
+  await screen.findByText("Could not load events");
+  expect(screen.getByText("Renamed in Google")).toBeInTheDocument();
+  failed = false;
+  deleted = true;
+  fireEvent.click(screen.getByRole("button", {name: /Sync calendar/}));
+  await waitFor(() => expect(screen.queryByText("Renamed in Google")).not.toBeInTheDocument());
+  expect(screen.queryByLabelText("Task classification")).not.toBeInTheDocument();
+});
+
+
+test.each([undefined, 90])("synced tasks get a finite duration when minutes are %s", async (minutes) => {
+  global.fetch.mockImplementation((url) => {
+    if (String(url).endsWith("/auth/status")) return Promise.resolve(mockResponse({authenticated: false}));
+    if (String(url).endsWith("/tasks")) return Promise.resolve(mockResponse({Tasks: [{id: "google-task", title: "Imported task", due: "2030-01-07T00:00:00Z", estimated_duration_minutes: minutes}]}));
+    return Promise.resolve(mockResponse({schedule: {scheduled: [], unscheduled: []}}));
+  });
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", {name: /Sync tasks/}));
+  await screen.findByText("Imported task");
+  expect(screen.queryByText(/NaNh/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: /Schedule/}));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/scheduledtasks"))).toBe(true));
+  const [, options] = global.fetch.mock.calls.find(([url]) => String(url).endsWith("/scheduledtasks"));
+  expect(JSON.parse(options.body).tasks[0].estimated_duration).toBe(minutes === undefined ? 1 : 1.5);
+});
+
+test("shows readable scheduling validation errors", async () => {
+  global.fetch.mockImplementation((url) => {
+    if (String(url).endsWith("/auth/status")) return Promise.resolve(mockResponse({authenticated: false}));
+    if (String(url).endsWith("/tasks")) return Promise.resolve(mockResponse({Tasks: [{title: "Imported task", due: "2030-01-07T00:00:00Z"}]}));
+    return Promise.resolve(mockResponse({detail: [{loc: ["body", "tasks", 0, "deadline"], msg: "Invalid date"}]}, {ok: false, status: 422}));
+  });
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", {name: /Sync tasks/}));
+  await screen.findByText("Imported task");
+  fireEvent.click(screen.getByRole("button", {name: /Schedule/}));
+  expect(await screen.findByText("tasks.0.deadline: Invalid date")).toBeInTheDocument();
+});
+
+
+test("removes a queued task without sending a deletion to Google", async () => {
+  render(<App />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole("button", {name: "+"}));
+  fireEvent.change(screen.getByLabelText("Task title"), {target: {value: "Cancel this task"}});
+  fireEvent.change(screen.getByLabelText("Deadline"), {target: {value: "2030-01-07"}});
+  fireEvent.change(screen.getByLabelText("Duration hours"), {target: {value: "1"}});
+  fireEvent.click(screen.getByText("Add to queue"));
+  fireEvent.click(screen.getByRole("button", {name: "Remove Cancel this task from queue"}));
+  expect(screen.queryByText("Cancel this task")).not.toBeInTheDocument();
+  expect(screen.queryByText("Task details")).not.toBeInTheDocument();
+  expect(screen.getByText("Your queue is clear")).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each(["week", "month"])("opens and closes task details from %s calendar", async (view) => {
+  // jsdom has no native showModal implementation.
+  const original = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  try {
+    const today = new Date();
+    const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    global.fetch.mockImplementation((url) => Promise.resolve(mockResponse(String(url).endsWith("/auth/status")
+      ? {authenticated: false}
+      : {events: [{id: "event-detail", summary: "Review document", start: {dateTime: `${day}T09:00:00`}, end: {dateTime: `${day}T10:30:00`}}]})));
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", {name: /Sync calendar/}));
+    fireEvent.click(screen.getByRole("button", {name: view}));
+    fireEvent.click(await screen.findByRole("button", {name: /Review document/}));
+    const dialog = screen.getByRole("dialog", {name: "Review document"});
+    expect(within(dialog).getByText("90 minutes")).toBeInTheDocument();
+    expect(within(dialog).getByText("Starts")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", {name: "Close task details"}));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  } finally {
+    if (original) HTMLDialogElement.prototype.showModal = original;
+    else delete HTMLDialogElement.prototype.showModal;
+  }
 });
